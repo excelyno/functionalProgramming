@@ -1,0 +1,88 @@
+[debug] > Exec(early(addDefaultCommands), None, None)
+[debug] > Exec(addDefaultCommands, None, None)
+[debug] > Exec(early(initialize), None, None)
+[debug] > Exec(initialize, None, None)
+[debug] > Exec(boot, None, None)
+[debug] > Exec(writeSbtVersion, None, None)
+[debug] > Exec(reload, None, None)
+[debug] > Exec(sbtStashOnFailure, None, None)
+[debug] > Exec(onFailure loadFailed, None, None)
+[debug] > Exec(loadp, None, None)
+[info] welcome to sbt 1.10.7 (Oracle Corporation Java 21)
+[debug] Load.defaultLoad until apply took 148.4537ms
+[debug]           Load.loadUnit: plugins took 93.1514ms
+[debug]           Load.loadUnit: defsScala took 0.2762ms
+[debug] [Loading] Scanning directory C:\Users\excel yanto\Downloads\appGw\project
+[debug] [Loading] Found non-root projects 
+[debug] [Loading] Done in C:\Users\excel yanto\Downloads\appGw\project, returning: ()
+[debug] deducing auto plugins based on known facts Set(Atom(sbt.plugins.CorePlugin)) and clauses Clauses(Clause(Atom(sbt.plugins.JvmPlugin),Set(Atom(sbt.plugins.IvyPlugin)))
+[debug] Clause(Atom(sbt.ScriptedPlugin),Set(Atom(sbt.plugins.JvmPlugin)))
+[debug] Clause(Atom(sbt.plugins.SbtPlugin),Set(Atom(sbt.ScriptedPlugin)))
+[debug] Clause(Atom(sbt.plugins.SemanticdbPlugin),Set(Atom(sbt.plugins.JvmPlugin)))
+[debug] Clause(Atom(sbt.plugins.JUnitXmlReportPlugin),Set(Atom(sbt.plugins.JvmPlugin)))
+[debug] Clause(Atom(sbt.plugins.MiniDependencyTreePlugin),Set(Atom(sbt.plugins.JvmPlugin)))
+[debug] Clause(Atom(sbt.plugins.CorePlugin),Set(Atom(sbt.plugins.IvyPlugin)))
+[debug] Clause(Atom(sbt.plugins.IvyPlugin),Set(Atom(sbt.plugins.JvmPlugin)))
+[debug] Clause(Atom(sbt.plugins.JvmPlugin),Set(Atom(sbt.plugins.SemanticdbPlugin)))
+[debug] Clause(Atom(sbt.plugins.JvmPlugin),Set(Atom(sbt.plugins.JUnitXmlReportPlugin)))
+[debug] Clause(Atom(sbt.plugins.CorePlugin),Set(Atom(sbt.plugins.Giter8TemplatePlugin)))
+[debug] Clause(Atom(sbt.plugins.JvmPlugin),Set(Atom(sbt.plugins.MiniDependencyTreePlugin))))
+[debug]   :: deduced result: Matched(sbt.plugins.CorePlugin,sbt.plugins.Giter8TemplatePlugin,sbt.plugins.IvyPlugin,sbt.plugins.JvmPlugin,sbt.plugins.MiniDependencyTreePlugin,sbt.plugins.JUnitXmlReportPlugin,sbt.plugins.SemanticdbPlugin)
+[debug] Plugins.deducer#function took 30.2529 ms
+[debug]               Load.resolveProject(appgw-build) took 39.9386ms
+[debug]             Load.loadTransitive: finalizeProject(Project(id appgw-build, base: C:\Users\excel yanto\Downloads\appGw\project, plugins: List(<none>))) took 97.5682ms
+[debug] [Loading] Done in C:\Users\excel yanto\Downloads\appGw\project, returning: (appgw-build)
+[debug]           Load.loadUnit: loadedProjectsRaw took 133.7557ms
+[debug]           Load.loadUnit: cleanEvalClasses took 0.1465ms
+[debug]         Load.loadUnit(file:/C:/Users/excel%20yanto/Downloads/appGw/project/, ...) took 235.9544ms
+[debug]       Load.apply: load took 395.7797ms
+[debug]       Load.apply: resolveProjects took 4.3635ms
+[debug]       Load.apply: finalTransforms took 56.9647ms
+[debug]       Load.apply: config.delegates took 7.6053ms
+[debug]       Load.apply: Def.make(settings)... took 606.0047ms
+[debug]       Load.apply: structureIndex took 108.6326ms
+[debug]       Load.apply: mkStreams took 12.0123ms
+[info] loading project definition from C:\Users\excel yanto\Downloads\appGw\project
+[debug] Running task... Cancel: Signal, check cycles: false, forcegc: true
+[debug]     Load.loadUnit: plugins took 2208.53ms
+[debug]     Load.loadUnit: defsScala took 0.0059ms
+[debug] [Loading] Scanning directory C:\Users\excel yanto\Downloads\appGw
+[debug]       Load.loadUnit: mkEval took 3.5149ms
+[debug] [Loading] Found non-root projects 
+[debug] [Loading] Done in C:\Users\excel yanto\Downloads\appGw, returning: ()
+[debug] deducing auto plugins based on known facts Set(Atom(sbt.plugins.CorePlugin)) and clauses Clauses(Clause(Atom(sbt.plugins.JvmPlugin),Set(Atom(sbt.plugins.IvyPlugin)))
+[debug] Clause(Atom(sbt.ScriptedPlugin),Set(Atom(sbt.plugins.JvmPlugin)))
+[debug] Clause(Atom(sbt.plugins.SbtPlugin),Set(Atom(sbt.ScriptedPlugin)))
+[debug] Clause(Atom(sbt.plugins.SemanticdbPlugin),Set(Atom(sbt.plugins.JvmPlugin)))
+[debug] Clause(Atom(sbt.plugins.JUnitXmlReportPlugin),Set(Atom(sbt.plugins.JvmPlugin)))
+[debug] Clause(Atom(sbt.plugins.MiniDependencyTreePlugin),Set(Atom(sbt.plugins.JvmPlugin)))
+[debug] Clause(Atom(sbt.plugins.CorePlugin),Set(Atom(sbt.plugins.IvyPlugin)))
+[debug] Clause(Atom(sbt.plugins.IvyPlugin),Set(Atom(sbt.plugins.JvmPlugin)))
+[debug] Clause(Atom(sbt.plugins.JvmPlugin),Set(Atom(sbt.plugins.SemanticdbPlugin)))
+[debug] Clause(Atom(sbt.plugins.JvmPlugin),Set(Atom(sbt.plugins.JUnitXmlReportPlugin)))
+[debug] Clause(Atom(sbt.plugins.CorePlugin),Set(Atom(sbt.plugins.Giter8TemplatePlugin)))
+[debug] Clause(Atom(sbt.plugins.JvmPlugin),Set(Atom(sbt.plugins.MiniDependencyTreePlugin))))
+[debug]   :: deduced result: Matched(sbt.plugins.CorePlugin,sbt.plugins.Giter8TemplatePlugin,sbt.plugins.IvyPlugin,sbt.plugins.JvmPlugin,sbt.plugins.MiniDependencyTreePlugin,sbt.plugins.JUnitXmlReportPlugin,sbt.plugins.SemanticdbPlugin)
+[debug] Plugins.deducer#function took 3.7142 ms
+[info] loading settings for project appgw from build.sbt...
+[debug]         Load.resolveProject(appgw) took 3.3111ms
+[debug]       Load.loadTransitive: finalizeProject(Project(id appgw, base: C:\Users\excel yanto\Downloads\appGw, plugins: List(<none>))) took 7.7327ms
+[debug] [Loading] Done in C:\Users\excel yanto\Downloads\appGw, returning: (appgw)
+[debug]     Load.loadUnit: loadedProjectsRaw took 321.6422ms
+[debug]     Load.loadUnit: cleanEvalClasses took 14.8549ms
+[debug]   Load.loadUnit(file:/C:/Users/excel%20yanto/Downloads/appGw/, ...) took 2547.8395ms
+[debug] Load.apply: load took 2581.3529ms
+[debug] Load.apply: resolveProjects took 0.1367ms
+[debug] Load.apply: finalTransforms took 7.6094ms
+[debug] Load.apply: config.delegates took 0.3487ms
+[debug] Load.apply: Def.make(settings)... took 68.7853ms
+[debug] Load.apply: structureIndex took 41.5891ms
+[debug] Load.apply: mkStreams took 0.0029ms
+[info] set current project to verdant (in build file:/C:/Users/excel%20yanto/Downloads/appGw/)
+[debug] > Exec(sbtPopOnFailure, None, None)
+[debug] > Exec(resumeFromFailure, None, None)
+[debug] > Exec(notifyUsersAboutShell, None, None)
+[debug] > Exec(iflast shell, None, None)
+[debug] > Exec(run, None, None)
+[debug] Evaluating tasks: Compile / run
+[debug] Running task... Cancel: Signal, check cycles: false, forcegc: true

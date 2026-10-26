@@ -1,0 +1,7 @@
+[error] -- [E050] Type Error: C:\Users\excel yanto\Downloads\appGw\src\main\scala\verdant\shell\Views.scala:897:14 
+[error] 897 |              p(cls := "text-muted small mb-2", s"Komoditas: ${p.cropVariety} · Lokasi: ${p.plotName}"),
+[error]     |              ^
+[error]     |              value p does not take parameters
+[error]     |
+[error]     | longer explanation available when compiling with `-explain`
+[error] one error found
