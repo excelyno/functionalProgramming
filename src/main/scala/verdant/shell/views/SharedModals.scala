@@ -6,14 +6,12 @@ import verdant.core.*
 /**
  * Modal form yang dipakai petani dan mandor.
  *
- * Semua modal lewat `modalFrame` supaya kerangka (header, body, footer) seragam.
- * Isian dibuat singkat: pilihan hanya muncul kalau memang membantu pengisian di HP
- * (jenis kegiatan, saran takaran lewat datalist), bukan tombol isi-otomatis.
+ * Semua modal dirancang seragam, bersih, dan nyaman digunakan baik di desktop maupun ponsel (HP).
  */
 trait SharedModals extends ViewHelpers:
 
   // --------------------------------------------------------------------------
-  // Kerangka & komponen kecil
+  // Kerangka dasar modal
   // --------------------------------------------------------------------------
   private def modalFrame(
     modalId: String,
@@ -40,25 +38,17 @@ trait SharedModals extends ViewHelpers:
       )
     )
 
-  private def field(forId: String, text: String, hint: Option[String] = None)(controls: Modifier*): Modifier =
-    div(cls := "mb-3")(
-      label(cls := "form-label small fw-medium mb-1", `for` := forId, text),
-      frag(controls*),
-      hint.map(h => div(cls := "form-text small", h)).getOrElse(modifier())
-    )
-
   private def cancelButton: Modifier =
     button(`type` := "button", cls := "btn btn-sm btn-link text-secondary text-decoration-none", data("bs-dismiss") := "modal", "Batal")
 
   // ==========================================================================
-  // 1. MODAL: CATAT KEGIATAN LAPANGAN
+  // 1. MODAL: CATAT KEGIATAN LAPANGAN (PETANI)
   // ==========================================================================
   def catatKegiatanModal(
     periods: List[(CultivationPeriod, String)],
     defaultPeriodCode: Option[String] = None,
     currentUser: Option[User] = None
   ): Modifier =
-    // (nilai, label, placeholder takaran, saran takaran dipisah "|")
     val kinds = List(
       ("Penyiraman",        "Penyiraman",        "mis. 200 liter",        "100 liter|200 liter|1 drum"),
       ("Pemupukan",         "Pemupukan",         "mis. 25 kg NPK",        "10 kg NPK|25 kg NPK|50 kg kompos"),
@@ -77,11 +67,13 @@ trait SharedModals extends ViewHelpers:
         var list = root.querySelector('#catat-qty-list');
         root.querySelectorAll('input[name="activityType"]').forEach(function (r) {
           r.addEventListener('change', function () {
-            qty.placeholder = r.dataset.placeholder || '';
-            list.innerHTML = '';
-            (r.dataset.suggest ? r.dataset.suggest.split('|') : []).forEach(function (s) {
-              var o = document.createElement('option'); o.value = s; list.appendChild(o);
-            });
+            if (qty) qty.placeholder = r.dataset.placeholder || '';
+            if (list) {
+              list.innerHTML = '';
+              (r.dataset.suggest ? r.dataset.suggest.split('|') : []).forEach(function (s) {
+                var o = document.createElement('option'); o.value = s; list.appendChild(o);
+              });
+            }
           });
         });
         var first = root.querySelector('input[name="activityType"]:checked');
@@ -90,7 +82,9 @@ trait SharedModals extends ViewHelpers:
       """
 
     modalFrame("catatKegiatanModal", "Catat kegiatan", "/catatan/tambah")(
-      field("catat-period", "Petak lahan")(
+      // 1. Petak Lahan
+      div(cls := "mb-3")(
+        label(cls := "form-label small fw-medium mb-1", `for` := "catat-period", "Petak lahan"),
         select(name := "periodCode", id := "catat-period", cls := "form-select form-select-sm", required := true)(
           if periods.isEmpty then
             option(value := "", "Belum ada petak aktif")
@@ -105,6 +99,7 @@ trait SharedModals extends ViewHelpers:
         )
       ),
 
+      // 2. Jenis Kegiatan
       div(cls := "mb-3")(
         span(cls := "form-label small fw-medium d-block mb-1", "Jenis kegiatan"),
         div(cls := "d-flex flex-wrap gap-2", role := "radiogroup")(
@@ -118,75 +113,13 @@ trait SharedModals extends ViewHelpers:
                 data("suggest") := sug,
                 if idx == 0 then checked := true else modifier()
               ),
- 
-              div(cls := "mb-3")(
-                span(cls := "form-label small fw-medium d-block mb-1", "Jenis kegiatan"),
-                div(cls := "d-flex flex-wrap gap-2", role := "radiogroup")(
-                  kinds.zipWithIndex.map { case ((v, lbl, ph, sug), idx) =>
-                    val rid = s"catat-kind-$idx"
-                    frag(
-                      input(
-                        `type` := "radio", cls := "btn-check", name := "activityType", id := rid,
-                        value := v,
-                        data("placeholder") := ph,
-                        data("suggest") := sug,
-                        if idx == 0 then checked := true else modifier()
-                      ),
-                      label(cls := "btn btn-sm btn-outline-success rounded-pill px-3", `for` := rid, lbl)
-                    )
-                  }
-                )
-              ),
- 
-              div(cls := "row g-3 mb-3")(
-                div(cls := "col-5")(
-                  label(cls := "form-label small fw-medium mb-1", `for` := "catat-date", "Tanggal"),
-                  input(`type` := "date", id := "catat-date", name := "activityDate", cls := "form-control form-control-sm", value := todayStr, required := true)
-                ),
-                div(cls := "col-7")(
-                  label(cls := "form-label small fw-medium mb-1", `for` := "catat-qty", "Takaran / hasil"),
-                  input(`type` := "text", id := "catat-qty", name := "quantity", cls := "form-control form-control-sm",
-                    attr("list") := "catat-qty-list", autocomplete := "off"),
-                  tag("datalist")(id := "catat-qty-list")
-                )
-              ),
- 
-              div(cls := "mb-3")(
-                label(cls := "form-label small fw-medium mb-1", `for` := "catat-notes", "Kondisi lapangan"),
-                textarea(name := "notes", id := "catat-notes", cls := "form-control form-control-sm", rows := 3, required := true,
-                  placeholder := "Apa yang dilakukan, kondisi tanaman, cuaca, atau masalah yang ditemukan")
-              ),
- 
-              currentUser match
-                case Some(u) =>
-                  div(cls := "mb-2")(
-                    label(cls := "form-label small fw-medium mb-1", "Petani pelaksana"),
-                    div(cls := "p-2 bg-light border rounded-2 small d-flex align-items-center justify-content-between")(
-                      span(cls := "fw-semibold text-dark", u.fullName),
-                      span(cls := "badge bg-success-subtle text-success border border-success-subtle", "Akun Terverifikasi")
-                    ),
-                    input(`type` := "hidden", id := "catat-farmer", name := "farmerName", value := u.fullName)
-                  )
-                case None =>
-                  div(cls := "mb-2")(
-                    label(cls := "form-label small fw-medium mb-1", `for` := "catat-farmer", "Petani pelaksana"),
-                    input(`type` := "text", id := "catat-farmer", name := "farmerName", cls := "form-control form-control-sm",
-                      required := true, autocomplete := "off", attr("list") := "catat-farmer-list", value := "Pak Joko"),
-                    tag("datalist")(id := "catat-farmer-list")(
-                      List("Pak Joko", "Pak Slamet", "Bu Siti").map(n => option(value := n))
-                    )
-                  )
-            ),
- 
-            div(cls := "modal-footer py-3 px-4")(
-              p(cls := "text-muted me-auto mb-0", style := "font-size: 12px;", "Catatan tidak bisa diubah atau dihapus setelah disimpan."),
-              button(`type` := "button", cls := "btn btn-sm btn-link text-secondary text-decoration-none", data("bs-dismiss") := "modal", "Batal"),
-              button(`type` := "submit", cls := "btn btn-sm btn-verdant px-4", "Simpan")
+              label(cls := "btn btn-sm btn-outline-success rounded-pill px-3", `for` := rid, lbl)
             )
           }
         )
       ),
 
+      // 3. Tanggal & Takaran
       div(cls := "row g-3 mb-3")(
         div(cls := "col-5")(
           label(cls := "form-label small fw-medium mb-1", `for` := "catat-date", "Tanggal"),
@@ -200,18 +133,34 @@ trait SharedModals extends ViewHelpers:
         )
       ),
 
-      field("catat-notes", "Kondisi lapangan")(
+      // 4. Catatan Lapangan
+      div(cls := "mb-3")(
+        label(cls := "form-label small fw-medium mb-1", `for` := "catat-notes", "Kondisi lapangan"),
         textarea(name := "notes", id := "catat-notes", cls := "form-control form-control-sm", rows := 3, required := true,
           placeholder := "Apa yang dilakukan, kondisi tanaman, cuaca, atau masalah yang ditemukan")
       ),
 
-      field("catat-farmer", "Petani pelaksana")(
-        input(`type` := "text", id := "catat-farmer", name := "farmerName", cls := "form-control form-control-sm",
-          required := true, autocomplete := "off", attr("list") := "catat-farmer-list"),
-        tag("datalist")(id := "catat-farmer-list")(
-          List("Pak Joko", "Pak Slamet", "Bu Siti").map(n => option(value := n))
-        )
-      ),
+      // 5. Petani Pelaksana
+      currentUser match
+        case Some(u) =>
+          div(cls := "mb-2")(
+            label(cls := "form-label small fw-medium mb-1", "Petani pelaksana"),
+            div(cls := "p-2 bg-light border rounded-2 small d-flex align-items-center justify-content-between")(
+              span(cls := "fw-semibold text-dark", u.fullName),
+              span(cls := "badge bg-success-subtle text-success border border-success-subtle", "Akun Terverifikasi")
+            ),
+            input(`type` := "hidden", id := "catat-farmer", name := "farmerName", value := u.fullName)
+          )
+        case None =>
+          div(cls := "mb-2")(
+            label(cls := "form-label small fw-medium mb-1", `for` := "catat-farmer", "Petani pelaksana"),
+            input(`type` := "text", id := "catat-farmer", name := "farmerName", cls := "form-control form-control-sm",
+              required := true, autocomplete := "off", attr("list") := "catat-farmer-list", value := "Pak Joko"),
+            tag("datalist")(id := "catat-farmer-list")(
+              List("Pak Joko", "Pak Slamet", "Bu Siti").map(n => option(value := n))
+            )
+          )
+      ,
 
       script(raw(modalScript))
     )(
@@ -227,7 +176,6 @@ trait SharedModals extends ViewHelpers:
     publishedGuides: List[(PublishedGuide, String)],
     defaultGuideId: Option[String] = None
   ): Modifier =
-    // Kode lahan otomatis dibuat dari nama petak, selama belum diubah manual.
     val modalScript =
       """
       (function () {
@@ -249,7 +197,8 @@ trait SharedModals extends ViewHelpers:
       "/masa-tanam/buka",
       Some("Takaran pupuk dan air di lahan akan mengikuti cetakan yang dipilih.")
     )(
-      field("plot-guide", "Cetakan budidaya", Some("Cetakan dikunci pada edisi ini dan tidak berubah walau mandor merilis edisi baru."))(
+      div(cls := "mb-3")(
+        label(cls := "form-label small fw-medium mb-1", `for` := "plot-guide", "Cetakan budidaya"),
         select(name := "guideSelection", id := "plot-guide", cls := "form-select form-select-sm", required := true)(
           if publishedGuides.isEmpty then
             option(value := "", "Belum ada cetakan dari mandor")
@@ -261,17 +210,21 @@ trait SharedModals extends ViewHelpers:
                 s"$guideTitle (${pub.editionTag})"
               )
             }
-        )
+        ),
+        div(cls := "form-text small", "Cetakan dikunci pada edisi ini dan tidak berubah walau mandor merilis edisi baru.")
       ),
 
-      field("plot-name", "Nama petak lahan")(
+      div(cls := "mb-3")(
+        label(cls := "form-label small fw-medium mb-1", `for` := "plot-name", "Nama petak lahan"),
         input(`type` := "text", id := "plot-name", name := "plotName", cls := "form-control form-control-sm",
           placeholder := "mis. Petak Barat, Greenhouse 2A", required := true, autocomplete := "off")
       ),
 
-      field("plot-code", "Kode lahan", Some("Dipakai sebagai pengenal log kegiatan. Terisi otomatis dari nama petak, bisa diubah."))(
+      div(cls := "mb-3")(
+        label(cls := "form-label small fw-medium mb-1", `for` := "plot-code", "Kode lahan"),
         input(`type` := "text", id := "plot-code", name := "code", cls := "form-control form-control-sm font-monospace",
-          placeholder := "mis. Petak-Barat", required := true, autocomplete := "off")
+          placeholder := "mis. Petak-Barat", required := true, autocomplete := "off"),
+        div(cls := "form-text small", "Dipakai sebagai pengenal log kegiatan. Terisi otomatis dari nama petak, bisa diubah.")
       ),
 
       script(raw(modalScript))
@@ -284,53 +237,46 @@ trait SharedModals extends ViewHelpers:
   // 3. MODAL: BUAT CETAKAN BUDIDAYA BARU (MANDOR)
   // ==========================================================================
   def tambahPanduanModal(currentUser: Option[User] = None): Modifier =
-    div(cls := "modal fade", id := "tambahPanduanModal", tabindex := "-1")(
-      div(cls := "modal-dialog modal-dialog-centered")(
-        div(cls := "modal-content border-0 shadow rounded-4 overflow-hidden")(
-          form(action := "/panduan/tambah", method := "POST")(
-            div(cls := "modal-header border-bottom py-3 px-4 bg-light")(
-              div(
-                h5(cls := "modal-title fs-6 fw-bold text-dark mb-0", "Buat Cetakan Budidaya Baru (Mandor)"),
-                span(cls := "text-muted small", "Mandor menyusun standar SOP acuan tanam petani")
-              ),
-              button(`type` := "button", cls := "btn-close small", data("bs-dismiss") := "modal")
+    modalFrame(
+      "tambahPanduanModal",
+      "Buat cetakan budidaya baru",
+      "/panduan/tambah",
+      Some("Mandor menyusun standar SOP acuan tanam petani.")
+    )(
+      div(cls := "mb-3")(
+        label(cls := "form-label small fw-medium mb-1", `for` := "guide-id", "ID Cetakan"),
+        input(`type` := "text", id := "guide-id", name := "id", cls := "form-control form-control-sm",
+          placeholder := "mis. cetakan-cabai-01", required := true, autocomplete := "off")
+      ),
+
+      div(cls := "mb-3")(
+        label(cls := "form-label small fw-medium mb-1", `for` := "guide-name", "Nama cetakan SOP"),
+        input(`type` := "text", id := "guide-name", name := "name", cls := "form-control form-control-sm",
+          placeholder := "mis. Cetakan Budidaya Cabai Rawit (Lahan 1)", required := true, autocomplete := "off")
+      ),
+
+      div(cls := "mb-3")(
+        label(cls := "form-label small fw-medium mb-1", `for` := "guide-crop", "Komoditas & Varietas"),
+        input(`type` := "text", id := "guide-crop", name := "cropVariety", cls := "form-control form-control-sm",
+          placeholder := "mis. Cabai Rawit Merah Varietas Ori 212", required := true, autocomplete := "off")
+      ),
+
+      currentUser match
+        case Some(u) =>
+          div(cls := "mb-2")(
+            label(cls := "form-label small fw-medium mb-1", "Mandor penyusun"),
+            div(cls := "p-2 bg-light border rounded-2 small d-flex align-items-center justify-content-between")(
+              span(cls := "fw-semibold text-dark", u.fullName),
+              span(cls := "badge bg-primary-subtle text-primary border border-primary-subtle", "Mandor Terverifikasi")
             ),
-            div(cls := "modal-body py-3 px-4")(
-              div(cls := "mb-3")(
-                label(cls := "form-label small fw-bold text-dark", "ID Cetakan"),
-                input(`type` := "text", name := "id", cls := "form-control form-control-sm py-2", placeholder := "Contoh: cetakan-cabai-01", required := true)
-              ),
-              div(cls := "mb-3")(
-                label(cls := "form-label small fw-bold text-dark", "Nama Lengkap Cetakan SOP"),
-                input(`type` := "text", name := "name", cls := "form-control form-control-sm py-2", placeholder := "Contoh: Cetakan Budidaya Cabai Rawit (Lahan 1)", required := true)
-              ),
-              div(cls := "mb-3")(
-                label(cls := "form-label small fw-bold text-dark", "Komoditas & Varietas"),
-                input(`type` := "text", name := "cropVariety", cls := "form-control form-control-sm py-2", placeholder := "Contoh: Cabai Rawit Merah", required := true)
-              ),
-              currentUser match
-                case Some(u) =>
-                  div(cls := "mb-2")(
-                    label(cls := "form-label small fw-bold text-dark", "Mandor Penyusun"),
-                    div(cls := "p-2 bg-light border rounded-2 small d-flex align-items-center justify-content-between")(
-                      span(cls := "fw-semibold text-dark", u.fullName),
-                      span(cls := "badge bg-primary-subtle text-primary border border-primary-subtle", "Mandor Terverifikasi")
-                    ),
-                    input(`type` := "hidden", name := "author", value := u.fullName)
-                  )
-                case None =>
-                  div(cls := "mb-2")(
-                    label(cls := "form-label small fw-bold text-dark", "Nama Mandor Penyusun"),
-                    input(`type` := "text", name := "author", cls := "form-control form-control-sm py-2", placeholder := "Contoh: Ir. Budi Santoso", required := true, value := "Ir. Budi Santoso")
-                  )
-            ),
-            div(cls := "modal-footer border-top py-3 px-4 bg-light")(
-              button(`type` := "button", cls := "btn btn-sm btn-light border px-3", data("bs-dismiss") := "modal", "Batal"),
-              button(`type` := "submit", cls := "btn btn-sm btn-verdant px-4", "Simpan Draf Cetakan Awal")
-            )
+            input(`type` := "hidden", id := "guide-author", name := "author", value := u.fullName)
           )
-        )
-      )
+        case None =>
+          div(cls := "mb-2")(
+            label(cls := "form-label small fw-medium mb-1", `for` := "guide-author", "Nama mandor penyusun"),
+            input(`type` := "text", id := "guide-author", name := "author", cls := "form-control form-control-sm",
+              placeholder := "mis. Ir. Budi Santoso", required := true, value := "Ir. Budi Santoso")
+          )
     )(
       cancelButton,
       button(`type` := "submit", cls := "btn btn-sm btn-verdant px-4", "Simpan draf")
