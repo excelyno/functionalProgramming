@@ -47,28 +47,24 @@ object Main extends cask.MainRoutes:
       .flatMap(db.getUser)
 
   def getRole(req: cask.Request): Role =
-    getCurrentUser(req) match
-      case Some(u) => u.userRole
-      case None =>
-        val queryRole = Option(req.exchange.getQueryParameters.get("role"))
-          .flatMap(d => Option(d.peekFirst()))
-        val cookieRole = Option(req.exchange.getRequestCookies.get("verdant_role"))
-          .map(_.getValue)
-        queryRole.orElse(cookieRole).map(Role.fromString).getOrElse(Role.Farmer)
+    getCurrentUser(req).map(_.userRole).getOrElse(Role.Farmer)
 
   private def requireRole(req: cask.Request, required: Role)(action: => cask.Response[String]): cask.Response[String] =
-    val user = getCurrentUser(req)
-    val current = getRole(req)
-    if current == required then action
-    else
-      val requiredName = if required == Role.Supervisor then "Mandor / Supervisor" else "Petani"
-      val currentName = if current == Role.Supervisor then "Mandor" else "Petani"
-      htmlResponse(
-        Views.layout("Akses Ditolak", "beranda", current.toString.toLowerCase, Some(("danger", s"Akses Ditolak (403): Fitur ini memerlukan hak akses $requiredName.")), user)(
-          Views.forbiddenView(requiredName, currentName)
-        ),
-        status = 403
-      )
+    getCurrentUser(req) match
+      case None =>
+        cask.Redirect("/login")
+      case Some(user) =>
+        val current = user.userRole
+        if current == required then action
+        else
+          val requiredName = if required == Role.Supervisor then "Mandor" else "Petani"
+          val currentName = if current == Role.Supervisor then "Mandor" else "Petani"
+          htmlResponse(
+            Views.layout("Akses Ditolak", "beranda", current.toString.toLowerCase, Some(("danger", s"Akses Ditolak (403): Fitur ini memerlukan hak akses $requiredName.")), Some(user))(
+              Views.forbiddenView(requiredName, currentName)
+            ),
+            status = 403
+          )
 
   // ==========================================================================
   // AUTHENTICATION & SESSION ROUTES
@@ -137,52 +133,33 @@ object Main extends cask.MainRoutes:
     )
 
   // ==========================================================================
-  // DEMO ROLE SELECTOR ROUTE
-  // ==========================================================================
-
-  @cask.get("/role")
-  def switchRole(req: cask.Request, set: String, redirect: Option[String] = None): cask.Response[String] =
-    val targetRole = Role.fromString(set).toString.toLowerCase
-    val targetUrl = redirect.filter(r => r.startsWith("/") && !r.startsWith("//")).getOrElse("/")
-    val demoUserOpt = if targetRole == "supervisor" then db.getUserByUsername("mandor") else db.getUserByUsername("petani")
-    val userCookie = demoUserOpt.map(u => s"verdant_user_id=${u.id}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400").getOrElse(s"verdant_role=$targetRole; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400")
-    cask.Response(
-      data = "",
-      statusCode = 302,
-      headers = Seq(
-        "Location" -> targetUrl,
-        "Set-Cookie" -> userCookie,
-        "Set-Cookie" -> s"verdant_role=$targetRole; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400"
-      )
-    )
-
-  // ==========================================================================
   // 1. BERANDA (HOME / ROLE-SPECIFIC DASHBOARD)
   // ==========================================================================
 
   @cask.get("/")
   def beranda(req: cask.Request, alertKind: Option[String] = None, alertMsg: Option[String] = None): cask.Response[String] =
-    val role = getRole(req)
-    val user = getCurrentUser(req)
-    val alert = for { k <- alertKind; m <- alertMsg } yield (k, m)
+    getCurrentUser(req) match
+      case None =>
+        cask.Redirect("/login")
+      case Some(user) =>
+        val alert = for { k <- alertKind; m <- alertMsg } yield (k, m)
+        user.userRole match
+          case Role.Farmer =>
+            val periods = db.listPeriods()
+            val recentActivities = db.listActivities(None)
+            val publishedGuides = db.listPublishedGuidesWithSnapshots()
+            htmlResponse(Views.layout("Beranda Petani", "beranda", "farmer", alert, Some(user))(
+              Views.farmerBerandaView(periods, recentActivities, publishedGuides, Some(user))
+            ))
 
-    role match
-      case Role.Farmer =>
-        val periods = db.listPeriods()
-        val recentActivities = db.listActivities(None)
-        val publishedGuides = db.listPublishedGuidesWithSnapshots()
-        htmlResponse(Views.layout("Beranda Petani", "beranda", "farmer", alert, user)(
-          Views.farmerBerandaView(periods, recentActivities, publishedGuides, user)
-        ))
-
-      case Role.Supervisor =>
-        val draftsAwaiting = db.getDraftsAwaitingReview()
-        val publishedGuides = db.listPublishedGuides()
-        val guides = db.listGuides()
-        val recentRevisions = guides.flatMap(g => db.listRevisionsForGuide(g.id).take(2).map(r => (r, g.name)))
-        htmlResponse(Views.layout("Beranda Mandor", "beranda", "supervisor", alert, user)(
-          Views.supervisorBerandaView(draftsAwaiting, publishedGuides, recentRevisions, user)
-        ))
+          case Role.Supervisor =>
+            val draftsAwaiting = db.getDraftsAwaitingReview()
+            val publishedGuides = db.listPublishedGuides()
+            val guides = db.listGuides()
+            val recentRevisions = guides.flatMap(g => db.listRevisionsForGuide(g.id).take(2).map(r => (r, g.name)))
+            htmlResponse(Views.layout("Beranda Mandor", "beranda", "supervisor", alert, Some(user))(
+              Views.supervisorBerandaView(draftsAwaiting, publishedGuides, recentRevisions, Some(user))
+            ))
 
   // ==========================================================================
   // 2. FARMER WORKSPACE: MASA TANAM SAYA

@@ -26,8 +26,6 @@ trait LayoutView:
     val effectiveRole = currentUser.map(u => if u.isSupervisor then "supervisor" else "farmer").getOrElse(currentRole)
     val isSupervisor = effectiveRole.equalsIgnoreCase("supervisor") || effectiveRole.equalsIgnoreCase("mandor")
     val roleLabel = if isSupervisor then "Mandor" else "Petani"
-    val switchTargetRole = if isSupervisor then "farmer" else "supervisor"
-    val switchTargetLabel = if isSupervisor then "Mode petani" else "Mode mandor"
 
     def navLink(key: String, target: String, text: String): Modifier =
       li(cls := "nav-item")(
@@ -206,7 +204,7 @@ trait LayoutView:
                         a(
                           href := "/logout",
                           cls := "btn btn-sm btn-outline-light py-1 px-2",
-                          attr("title") := "Keluar dari sesi",
+                          attr("title") := "Keluar dari akun",
                           style := "font-size: 12.5px;"
                         )(
                           i(cls := "bi bi-box-arrow-right me-1"),
@@ -224,16 +222,6 @@ trait LayoutView:
                           "Masuk"
                         )
                       )
-                  ,
-                  a(
-                    href := s"/role?set=$switchTargetRole&redirect=/",
-                    cls := "btn btn-sm btn-outline-light py-1 px-2 d-none d-md-inline-flex",
-                    attr("title") := "Ganti mode cepat",
-                    style := "font-size: 12px;"
-                  )(
-                    i(cls := "bi bi-arrow-repeat me-1"),
-                    switchTargetLabel
-                  )
                 )
               )
             )
@@ -261,7 +249,8 @@ trait LayoutView:
               a(href := "/", cls := (if activeNav == "beranda" then "active" else ""))(i(cls := "bi bi-house"), span("Beranda")),
               a(href := "/masa-tanam", cls := (if activeNav == "masa-tanam" then "active" else ""))(i(cls := "bi bi-calendar3"), span("Lahan")),
               a(href := "/catatan", cls := (if activeNav == "catatan" then "active" else ""))(i(cls := "bi bi-journal-text"), span("Catatan")),
-              a(href := "/role?set=supervisor&redirect=/")(i(cls := "bi bi-arrow-repeat"), span("Mandor"))
+              a(href := "/panduan", cls := (if activeNav == "panduan" then "active" else ""))(i(cls := "bi bi-book"), span("Cetakan")),
+              a(href := "/logout")(i(cls := "bi bi-box-arrow-right"), span("Keluar"))
             )
           else
             Seq(
@@ -269,7 +258,7 @@ trait LayoutView:
               a(href := "/kelola-panduan", cls := (if activeNav == "kelola-panduan" then "active" else ""))(i(cls := "bi bi-journal-check"), span("Cetakan")),
               a(href := "/pemeriksaan-perubahan", cls := (if activeNav == "pemeriksaan-perubahan" then "active" else ""))(i(cls := "bi bi-arrow-left-right"), span("Perubahan")),
               a(href := "/riwayat", cls := (if activeNav == "riwayat" then "active" else ""))(i(cls := "bi bi-clock-history"), span("Riwayat")),
-              a(href := "/role?set=farmer&redirect=/")(i(cls := "bi bi-arrow-repeat"), span("Petani"))
+              a(href := "/logout")(i(cls := "bi bi-box-arrow-right"), span("Keluar"))
             )
         ),
 
@@ -285,19 +274,15 @@ trait LayoutView:
       div(cls := "p-4 p-md-5 bg-white border rounded-2 mx-auto", style := "max-width: 520px;")(
         h1(cls := "h5 fw-semibold text-dark mb-2", "Akses ditolak (403)"),
         p(cls := "text-secondary mb-4",
-          "Halaman ini hanya untuk peran ",
+          "Halaman ini khusus untuk akun dengan hak akses ",
           strong(cls := "text-dark", requiredRole),
-          ". Anda sedang memakai mode ",
+          ". Akun Anda saat ini memiliki peran ",
           strong(cls := "text-dark", currentRole),
-          ". Peran bisa diganti kapan saja."
+          "."
         ),
         div(cls := "d-flex gap-2 flex-wrap")(
-          if requiredRole.toLowerCase.contains("mandor") || requiredRole.toLowerCase.contains("supervisor") then
-            a(cls := "btn btn-verdant", href := "/role?set=supervisor&redirect=/", "Ganti ke mode mandor")
-          else
-            a(cls := "btn btn-verdant", href := "/role?set=farmer&redirect=/", "Ganti ke mode petani")
-          ,
-          a(cls := "btn btn-verdant-outline", href := "/", "Kembali ke beranda")
+          a(cls := "btn btn-verdant", href := "/login", "Masuk dengan Akun Lain"),
+          a(cls := "btn btn-verdant-outline", href := "/", "Kembali ke Beranda")
         )
       )
     )
