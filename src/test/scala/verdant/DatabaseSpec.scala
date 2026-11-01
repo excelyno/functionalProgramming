@@ -183,3 +183,51 @@ class DatabaseSpec extends FunSuite:
     assertEquals(restoredHead.id, headRev.id)
   }
 
+  test("Alur Pengguna & Otentikasi: Pemisahan akun Petani dan Mandor") {
+    // 1. Akun bawaan (Seed Users)
+    val users = db.listUsers()
+    assert(users.length >= 4)
+
+    val petaniOpt = db.getUserByUsername("petani")
+    assert(petaniOpt.isDefined)
+    val petani = petaniOpt.get
+    assertEquals(petani.fullName, "Pak Joko")
+    assertEquals(petani.role, "farmer")
+    assertEquals(petani.isFarmer, true)
+    assertEquals(petani.isSupervisor, false)
+
+    val mandorOpt = db.getUserByUsername("mandor")
+    assert(mandorOpt.isDefined)
+    val mandor = mandorOpt.get
+    assertEquals(mandor.fullName, "Ir. Budi Santoso")
+    assertEquals(mandor.role, "supervisor")
+    assertEquals(mandor.isSupervisor, true)
+    assertEquals(mandor.isFarmer, false)
+
+    // 2. Otentikasi sukses
+    val authPetani = db.authenticate("petani", "123")
+    assert(authPetani.isDefined)
+    assertEquals(authPetani.get.id, petani.id)
+
+    val authMandor = db.authenticate("mandor", "123")
+    assert(authMandor.isDefined)
+    assertEquals(authMandor.get.id, mandor.id)
+
+    // 3. Otentikasi gagal dengan sandi salah
+    val authFail = db.authenticate("petani", "salah-password")
+    assert(authFail.isEmpty)
+
+    val authUserUnknown = db.authenticate("bukan_user", "123")
+    assert(authUserUnknown.isEmpty)
+
+    // 4. Tambah user baru
+    val newUser = User("usr-test-01", "tejo", "rahasia", "Pak Tejo", "farmer")
+    db.createUser(newUser)
+
+    val tejoFound = db.getUser("usr-test-01")
+    assert(tejoFound.isDefined)
+    assertEquals(tejoFound.get.fullName, "Pak Tejo")
+    assertEquals(db.authenticate("tejo", "rahasia").isDefined, true)
+  }
+
+

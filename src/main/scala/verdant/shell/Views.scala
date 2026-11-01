@@ -91,6 +91,7 @@ object Views
     extends ViewHelpers
     with SharedModals
     with LayoutView
+    with LoginView
     with FarmerViews
     with SupervisorViews
     with JournalViews

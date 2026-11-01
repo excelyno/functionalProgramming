@@ -6,6 +6,30 @@ import upickle.default.{ReadWriter, macroRW}
 // IMMUTABLE CASE CLASSES (Verdant Agricultural Domain Models)
 // ============================================================================
 
+/** Peran Pengguna dalam Sistem Verdant */
+enum Role:
+  case Farmer, Supervisor
+
+object Role:
+  def fromString(s: String): Role =
+    if s != null && (s.equalsIgnoreCase("supervisor") || s.equalsIgnoreCase("mandor")) then Supervisor
+    else Farmer
+
+/** Akun Pengguna Terotentikasi (Petani vs Mandor) */
+case class User(
+  id: String,
+  username: String,
+  password: String,
+  fullName: String,
+  role: String // "farmer" atau "supervisor"
+):
+  def userRole: Role = Role.fromString(role)
+  def isSupervisor: Boolean = userRole == Role.Supervisor
+  def isFarmer: Boolean = userRole == Role.Farmer
+
+object User:
+  implicit val rw: ReadWriter[User] = macroRW
+
 /** Parameter teknis dan takaran budidaya pertanian */
 case class AgronomicParam(
   name: String,        // e.g. "Konsentrasi Nutrisi EC", "Target pH Air", "Dosis Pupuk NPK"

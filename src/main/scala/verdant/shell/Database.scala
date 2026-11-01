@@ -102,10 +102,108 @@ class Database(dbPath: String = "verdant.db"):
         );
         """
       )
+      stmt.execute(
+        """
+        CREATE TABLE IF NOT EXISTS users (
+          id TEXT PRIMARY KEY,
+          username TEXT UNIQUE NOT NULL,
+          password TEXT NOT NULL,
+          full_name TEXT NOT NULL,
+          role TEXT NOT NULL
+        );
+        """
+      )
     finally
       stmt.close()
 
     seedInitialDataIfEmpty()
+  }
+
+  // ==========================================================================
+  // PENGGUNA & OTENTIKASI (USERS & AUTHENTICATION)
+  // ==========================================================================
+
+  def listUsers(): List[User] = withConnection { conn =>
+    val ps = conn.prepareStatement("SELECT id, username, password, full_name, role FROM users ORDER BY full_name ASC")
+    val rs = ps.executeQuery()
+    val buf = collection.mutable.ListBuffer[User]()
+    while rs.next() do
+      buf += User(
+        rs.getString("id"),
+        rs.getString("username"),
+        rs.getString("password"),
+        rs.getString("full_name"),
+        rs.getString("role")
+      )
+    rs.close()
+    ps.close()
+    buf.toList
+  }
+
+  def getUser(id: String): Option[User] = withConnection { conn =>
+    val ps = conn.prepareStatement("SELECT id, username, password, full_name, role FROM users WHERE id = ?")
+    ps.setString(1, id)
+    val rs = ps.executeQuery()
+    val res = if rs.next() then
+      Some(User(
+        rs.getString("id"),
+        rs.getString("username"),
+        rs.getString("password"),
+        rs.getString("full_name"),
+        rs.getString("role")
+      ))
+    else None
+    rs.close()
+    ps.close()
+    res
+  }
+
+  def getUserByUsername(username: String): Option[User] = withConnection { conn =>
+    val ps = conn.prepareStatement("SELECT id, username, password, full_name, role FROM users WHERE LOWER(username) = LOWER(?)")
+    ps.setString(1, username)
+    val rs = ps.executeQuery()
+    val res = if rs.next() then
+      Some(User(
+        rs.getString("id"),
+        rs.getString("username"),
+        rs.getString("password"),
+        rs.getString("full_name"),
+        rs.getString("role")
+      ))
+    else None
+    rs.close()
+    ps.close()
+    res
+  }
+
+  def authenticate(username: String, password: String): Option[User] = withConnection { conn =>
+    val ps = conn.prepareStatement("SELECT id, username, password, full_name, role FROM users WHERE LOWER(username) = LOWER(?) AND password = ?")
+    ps.setString(1, username.trim)
+    ps.setString(2, password.trim)
+    val rs = ps.executeQuery()
+    val res = if rs.next() then
+      Some(User(
+        rs.getString("id"),
+        rs.getString("username"),
+        rs.getString("password"),
+        rs.getString("full_name"),
+        rs.getString("role")
+      ))
+    else None
+    rs.close()
+    ps.close()
+    res
+  }
+
+  def createUser(user: User): Unit = withConnection { conn =>
+    val ps = conn.prepareStatement("INSERT INTO users (id, username, password, full_name, role) VALUES (?, ?, ?, ?, ?)")
+    ps.setString(1, user.id)
+    ps.setString(2, user.username)
+    ps.setString(3, user.password)
+    ps.setString(4, user.fullName)
+    ps.setString(5, user.role)
+    ps.executeUpdate()
+    ps.close()
   }
 
   // ==========================================================================
@@ -634,6 +732,33 @@ class Database(dbPath: String = "verdant.db"):
   // ==========================================================================
 
   private def seedInitialDataIfEmpty(): Unit = withConnection { conn =>
+    val checkUsersPs = conn.createStatement()
+    val rsUsers = checkUsersPs.executeQuery("SELECT COUNT(*) FROM users")
+    val countUsers = if rsUsers.next() then rsUsers.getInt(1) else 0
+    rsUsers.close()
+    checkUsersPs.close()
+
+    if countUsers == 0 then
+      val seedUsers = List(
+        User("usr-petani-01", "petani", "123", "Pak Joko", "farmer"),
+        User("usr-petani-02", "slamet", "123", "Pak Slamet", "farmer"),
+        User("usr-mandor-01", "mandor", "123", "Ir. Budi Santoso", "supervisor"),
+        User("usr-mandor-02", "nuraini", "123", "Hj. Nuraini, S.P.", "supervisor")
+      )
+      val psUser = conn.prepareStatement(
+        "INSERT INTO users (id, username, password, full_name, role) VALUES (?, ?, ?, ?, ?)"
+      )
+      try
+        for u <- seedUsers do
+          psUser.setString(1, u.id)
+          psUser.setString(2, u.username)
+          psUser.setString(3, u.password)
+          psUser.setString(4, u.fullName)
+          psUser.setString(5, u.role)
+          psUser.executeUpdate()
+      finally
+        psUser.close()
+
     val checkPs = conn.createStatement()
     val rs = checkPs.executeQuery("SELECT COUNT(*) FROM guides")
     val count = if rs.next() then rs.getInt(1) else 0

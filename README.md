@@ -10,15 +10,32 @@ Verdant adalah aplikasi pencatatan kegiatan budidaya dan panduan bertani berbasi
 Verdant memisahkan kebutuhan dua kelompok pengguna tanpa membingungkan petani dengan istilah teknis rumit (tanpa *commit*, *diff*, *hash*, *branch*, *merge*, atau *repository*):
 
 1. **Petani (Penyiram, Pemupuk, Pemanen di Lapangan):**
+   - Masuk menggunakan akun terverifikasi (cth: Pak Joko `@petani`, Pak Slamet `@slamet`).
    - Mengakses aplikasi melalui ponsel pintar (*smartphone*).
-   - Mencatat kegiatan harian di kebun dengan 1 ketukan tombol besar (**"Catat Kegiatan"**).
+   - Mencatat kegiatan harian di kebun dengan 1 ketukan tombol besar (**"Catat Kegiatan"**). Nama petani otomatis terisi dari akun yang masuk dan tersimpan permanen secara paten.
    - Membaca instruksi dan takaran resmi tahap budidaya secara jelas dalam bahasa Indonesia.
    - Peringatan dini otomatis jika takaran pupuk/air melebihi rentang aman anjuran resmi.
 2. **Mandor & Penyuluh Pertanian (Pengawas & Pembuat Kebijakan):**
+   - Masuk menggunakan akun mandor (cth: Ir. Budi Santoso `@mandor`, Hj. Nuraini, S.P. `@nuraini`).
    - Memperbarui rekomendasi takaran pupuk atau durasi tahap secara aman (*non-destructive*).
    - Meninjau ringkasan perubahan dalam bahasa manusia (**"Apa yang berubah?"**).
    - Menyetujui dan menerbitkan edisi panduan resmi baru (*Release*) untuk masa tanam mendatang, atau menolak draf (*Reject*).
    - Memeriksa silsilah perubahan dan memulihkan (*Revert/Rollback*) panduan ke versi terdahulu jika diperlukan.
+
+---
+
+## 🔐 Akun & Otentikasi Pengguna
+
+Sistem Verdant menyediakan pemisahan hak akses akun yang tegas dan aman:
+
+| Peran (*Role*) | Nama Pengguna (*Username*) | Kata Sandi (*Password*) | Nama Lengkap / Identitas | Petak / Tugas Lapangan |
+| :--- | :--- | :--- | :--- | :--- |
+| **Petani** | `petani` | `123` | Pak Joko | Petani Lahan Greenhouse Blok 2A |
+| **Petani** | `slamet` | `123` | Pak Slamet | Petani Penggarap Lahan 1 Cabai |
+| **Mandor** | `mandor` | `123` | Ir. Budi Santoso | Mandor Kebun / Penyuluh Utama |
+| **Mandor** | `nuraini` | `123` | Hj. Nuraini, S.P. | Mandor Hortikultura & Cetakan |
+
+> 💡 **Fitur Masuk Cepat (1-Click Demo Login):** Di halaman `/login`, tersedia tombol masuk instan per akun demo sehingga penguji atau dosen penguji dapat langsung berganti peran tanpa harus mengetik manual.
 
 ---
 
@@ -143,7 +160,8 @@ verdant/
 │   │               └── views/                # Shell: Modul-modul tampilan HTML terpisah
 │   │                   ├── ViewHelpers.scala     # Format tanggal & utilitas tampilan
 │   │                   ├── SharedModals.scala    # Pop-up dialog form (Catat, Buka MT, SOP Baru)
-│   │                   ├── LayoutView.scala      # Master layout HTML, Navbar, Bootstrap 5, Role Switcher
+│   │                   ├── LayoutView.scala      # Master layout HTML, Navbar, Bootstrap 5, User Profile
+│   │                   ├── LoginView.scala       # Halaman Masuk (Form login & 1-Click Demo Login)
 │   │                   ├── FarmerViews.scala     # Antarmuka Petani (Beranda, Masa Tanam, Panduan)
 │   │                   ├── SupervisorViews.scala # Antarmuka Mandor (Kelola SOP, Diff, Riwayat)
 │   │                   └── JournalViews.scala    # Jurnal rekapitulasi catatan harian

@@ -6,14 +6,6 @@ import verdant.shell.*
 import java.net.URLDecoder
 import java.util.UUID
 
-enum Role:
-  case Farmer, Supervisor
-
-object Role:
-  def fromString(s: String): Role =
-    if s != null && (s.equalsIgnoreCase("supervisor") || s.equalsIgnoreCase("mandor")) then Supervisor
-    else Farmer
-
 object Main extends cask.MainRoutes:
 
   override def port: Int = 8080
@@ -23,7 +15,7 @@ object Main extends cask.MainRoutes:
   db.initSchema()
 
   // ==========================================================================
-  // REQUEST HELPERS & ROLE AUTHORIZATION
+  // REQUEST HELPERS, USER SESSIONS & ROLE AUTHORIZATION
   // ==========================================================================
 
   private def parseForm(req: cask.Request): Map[String, String] =
@@ -49,25 +41,100 @@ object Main extends cask.MainRoutes:
       headers = Seq("Content-Type" -> "text/html; charset=utf-8")
     )
 
-  def getRole(req: cask.Request): Role =
-    val queryRole = Option(req.exchange.getQueryParameters.get("role"))
-      .flatMap(d => Option(d.peekFirst()))
-    val cookieRole = Option(req.exchange.getRequestCookies.get("verdant_role"))
+  def getCurrentUser(req: cask.Request): Option[User] =
+    Option(req.exchange.getRequestCookies.get("verdant_user_id"))
       .map(_.getValue)
-    queryRole.orElse(cookieRole).map(Role.fromString).getOrElse(Role.Farmer)
+      .flatMap(db.getUser)
+
+  def getRole(req: cask.Request): Role =
+    getCurrentUser(req) match
+      case Some(u) => u.userRole
+      case None =>
+        val queryRole = Option(req.exchange.getQueryParameters.get("role"))
+          .flatMap(d => Option(d.peekFirst()))
+        val cookieRole = Option(req.exchange.getRequestCookies.get("verdant_role"))
+          .map(_.getValue)
+        queryRole.orElse(cookieRole).map(Role.fromString).getOrElse(Role.Farmer)
 
   private def requireRole(req: cask.Request, required: Role)(action: => cask.Response[String]): cask.Response[String] =
+    val user = getCurrentUser(req)
     val current = getRole(req)
     if current == required then action
     else
       val requiredName = if required == Role.Supervisor then "Mandor / Supervisor" else "Petani"
       val currentName = if current == Role.Supervisor then "Mandor" else "Petani"
       htmlResponse(
-        Views.layout("Akses Ditolak", "beranda", current.toString.toLowerCase, Some(("danger", s"Akses Ditolak (403): Fitur ini memerlukan hak akses $requiredName.")))(
+        Views.layout("Akses Ditolak", "beranda", current.toString.toLowerCase, Some(("danger", s"Akses Ditolak (403): Fitur ini memerlukan hak akses $requiredName.")), user)(
           Views.forbiddenView(requiredName, currentName)
         ),
         status = 403
       )
+
+  // ==========================================================================
+  // AUTHENTICATION & SESSION ROUTES
+  // ==========================================================================
+
+  @cask.get("/login")
+  def loginPage(req: cask.Request, error: Option[String] = None): cask.Response[String] =
+    getCurrentUser(req) match
+      case Some(_) =>
+        cask.Redirect("/")
+      case None =>
+        htmlResponse(Views.loginPage(error))
+
+  @cask.post("/login")
+  def loginSubmit(req: cask.Request): cask.Response[String] =
+    val form = parseForm(req)
+    val username = form.getOrElse("username", "").trim
+    val password = form.getOrElse("password", "").trim
+
+    db.authenticate(username, password) match
+      case Some(user) =>
+        cask.Response(
+          data = "",
+          statusCode = 302,
+          headers = Seq(
+            "Location" -> "/",
+            "Set-Cookie" -> s"verdant_user_id=${user.id}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400",
+            "Set-Cookie" -> s"verdant_role=${user.role}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400"
+          )
+        )
+      case None =>
+        htmlResponse(
+          Views.loginPage(
+            errorMsg = Some("Nama pengguna atau kata sandi tidak cocok. Silakan coba lagi."),
+            registeredUsername = username
+          ),
+          status = 401
+        )
+
+  @cask.get("/quick-login/:userId")
+  def quickLogin(userId: String, req: cask.Request): cask.Response[String] =
+    db.getUser(userId) match
+      case Some(user) =>
+        cask.Response(
+          data = "",
+          statusCode = 302,
+          headers = Seq(
+            "Location" -> "/",
+            "Set-Cookie" -> s"verdant_user_id=${user.id}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400",
+            "Set-Cookie" -> s"verdant_role=${user.role}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400"
+          )
+        )
+      case None =>
+        cask.Redirect("/login?error=Pengguna+tidak+ditemukan")
+
+  @cask.get("/logout")
+  def logout(req: cask.Request): cask.Response[String] =
+    cask.Response(
+      data = "",
+      statusCode = 302,
+      headers = Seq(
+        "Location" -> "/login",
+        "Set-Cookie" -> "verdant_user_id=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0",
+        "Set-Cookie" -> "verdant_role=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0"
+      )
+    )
 
   // ==========================================================================
   // DEMO ROLE SELECTOR ROUTE
@@ -77,11 +144,14 @@ object Main extends cask.MainRoutes:
   def switchRole(req: cask.Request, set: String, redirect: Option[String] = None): cask.Response[String] =
     val targetRole = Role.fromString(set).toString.toLowerCase
     val targetUrl = redirect.filter(r => r.startsWith("/") && !r.startsWith("//")).getOrElse("/")
+    val demoUserOpt = if targetRole == "supervisor" then db.getUserByUsername("mandor") else db.getUserByUsername("petani")
+    val userCookie = demoUserOpt.map(u => s"verdant_user_id=${u.id}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400").getOrElse(s"verdant_role=$targetRole; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400")
     cask.Response(
       data = "",
       statusCode = 302,
       headers = Seq(
         "Location" -> targetUrl,
+        "Set-Cookie" -> userCookie,
         "Set-Cookie" -> s"verdant_role=$targetRole; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400"
       )
     )
@@ -93,6 +163,7 @@ object Main extends cask.MainRoutes:
   @cask.get("/")
   def beranda(req: cask.Request, alertKind: Option[String] = None, alertMsg: Option[String] = None): cask.Response[String] =
     val role = getRole(req)
+    val user = getCurrentUser(req)
     val alert = for { k <- alertKind; m <- alertMsg } yield (k, m)
 
     role match
@@ -100,8 +171,8 @@ object Main extends cask.MainRoutes:
         val periods = db.listPeriods()
         val recentActivities = db.listActivities(None)
         val publishedGuides = db.listPublishedGuidesWithSnapshots()
-        htmlResponse(Views.layout("Beranda Petani", "beranda", "farmer", alert)(
-          Views.farmerBerandaView(periods, recentActivities, publishedGuides)
+        htmlResponse(Views.layout("Beranda Petani", "beranda", "farmer", alert, user)(
+          Views.farmerBerandaView(periods, recentActivities, publishedGuides, user)
         ))
 
       case Role.Supervisor =>
@@ -109,8 +180,8 @@ object Main extends cask.MainRoutes:
         val publishedGuides = db.listPublishedGuides()
         val guides = db.listGuides()
         val recentRevisions = guides.flatMap(g => db.listRevisionsForGuide(g.id).take(2).map(r => (r, g.name)))
-        htmlResponse(Views.layout("Beranda Mandor", "beranda", "supervisor", alert)(
-          Views.supervisorBerandaView(draftsAwaiting, publishedGuides, recentRevisions)
+        htmlResponse(Views.layout("Beranda Mandor", "beranda", "supervisor", alert, user)(
+          Views.supervisorBerandaView(draftsAwaiting, publishedGuides, recentRevisions, user)
         ))
 
   // ==========================================================================
@@ -119,11 +190,12 @@ object Main extends cask.MainRoutes:
 
   @cask.get("/masa-tanam")
   def masaTanamList(req: cask.Request, alertKind: Option[String] = None, alertMsg: Option[String] = None): cask.Response[String] =
+    val user = getCurrentUser(req)
     val periods = db.listPeriods()
     val publishedGuides = db.listPublishedGuides()
     val alert = for { k <- alertKind; m <- alertMsg } yield (k, m)
 
-    htmlResponse(Views.layout("Masa Tanam", "masa-tanam", getRole(req).toString.toLowerCase, alert)(
+    htmlResponse(Views.layout("Masa Tanam", "masa-tanam", getRole(req).toString.toLowerCase, alert, user)(
       Views.farmerMasaTanamListView(periods, publishedGuides)
     ))
 
@@ -151,6 +223,7 @@ object Main extends cask.MainRoutes:
 
   @cask.get("/masa-tanam/:code")
   def masaTanamDetail(code: String, req: cask.Request, alertKind: Option[String] = None, alertMsg: Option[String] = None): cask.Response[String] =
+    val user = getCurrentUser(req)
     db.getPeriod(code) match
       case None =>
         cask.Redirect("/masa-tanam?alertKind=warning&alertMsg=Masa+tanam+tidak+ditemukan.")
@@ -158,8 +231,8 @@ object Main extends cask.MainRoutes:
         val activities = db.listActivities(Some(code))
         val alert = for { k <- alertKind; m <- alertMsg } yield (k, m)
 
-        htmlResponse(Views.layout(s"Masa Tanam · ${period.code}", "masa-tanam", getRole(req).toString.toLowerCase, alert)(
-          Views.farmerMasaTanamDetailView(period, guide, revision, publishedGuide, activities)
+        htmlResponse(Views.layout(s"Masa Tanam · ${period.code}", "masa-tanam", getRole(req).toString.toLowerCase, alert, user)(
+          Views.farmerMasaTanamDetailView(period, guide, revision, publishedGuide, activities, user)
         ))
 
   // ==========================================================================
@@ -169,12 +242,13 @@ object Main extends cask.MainRoutes:
   @cask.get("/panduan")
   def panduanList(req: cask.Request, alertKind: Option[String] = None, alertMsg: Option[String] = None): cask.Response[String] =
     val role = getRole(req)
+    val user = getCurrentUser(req)
     val alert = for { k <- alertKind; m <- alertMsg } yield (k, m)
 
     role match
       case Role.Farmer =>
         val publishedGuides = db.listPublishedGuidesWithSnapshots()
-        htmlResponse(Views.layout("Panduan Budidaya", "panduan", "farmer", alert)(
+        htmlResponse(Views.layout("Panduan Budidaya", "panduan", "farmer", alert, user)(
           Views.farmerPanduanListView(publishedGuides)
         ))
       case Role.Supervisor =>
@@ -183,6 +257,7 @@ object Main extends cask.MainRoutes:
   @cask.get("/panduan/:id")
   def panduanDetail(id: String, req: cask.Request, alertKind: Option[String] = None, alertMsg: Option[String] = None): cask.Response[String] =
     val role = getRole(req)
+    val user = getCurrentUser(req)
     val alert = for { k <- alertKind; m <- alertMsg } yield (k, m)
 
     db.getGuide(id) match
@@ -200,7 +275,7 @@ object Main extends cask.MainRoutes:
                     cask.Redirect("/panduan?alertKind=danger&alertMsg=Revisi+edisi+resmi+tidak+ditemukan.")
                   case Some(pubRev) =>
                     val summary = VerdantCore.summarizeGuide(pubRev.snapshot)
-                    htmlResponse(Views.layout(guide.name, "panduan", "farmer", alert)(
+                    htmlResponse(Views.layout(guide.name, "panduan", "farmer", alert, user)(
                       Views.farmerPanduanDetailView(guide, pub, pubRev.snapshot, summary)
                     ))
 
@@ -211,7 +286,7 @@ object Main extends cask.MainRoutes:
               case Some(latestRevision) =>
                 val publishedOpt = db.getLatestPublishedGuide(id)
                 val summary = VerdantCore.summarizeGuide(latestRevision.snapshot)
-                htmlResponse(Views.layout(guide.name, "kelola-panduan", "supervisor", alert)(
+                htmlResponse(Views.layout(guide.name, "kelola-panduan", "supervisor", alert, user)(
                   Views.supervisorPanduanDetailView(guide, latestRevision, publishedOpt, summary)
                 ))
 
@@ -222,25 +297,27 @@ object Main extends cask.MainRoutes:
   @cask.get("/kelola-panduan")
   def kelolaPanduan(req: cask.Request, alertKind: Option[String] = None, alertMsg: Option[String] = None): cask.Response[String] =
     requireRole(req, Role.Supervisor) {
+      val user = getCurrentUser(req)
       val guides = db.listGuides().flatMap { g =>
         db.getLatestRevision(g.id).map { rev =>
           (g, rev, db.getLatestPublishedGuide(g.id))
         }
       }
       val alert = for { k <- alertKind; m <- alertMsg } yield (k, m)
-      htmlResponse(Views.layout("Kelola Panduan", "kelola-panduan", "supervisor", alert)(
-        Views.supervisorKelolaPanduanView(guides)
+      htmlResponse(Views.layout("Kelola Panduan", "kelola-panduan", "supervisor", alert, user)(
+        Views.supervisorKelolaPanduanView(guides, user)
       ))
     }
 
   @cask.post("/panduan/tambah")
   def tambahPanduan(req: cask.Request): cask.Response[String] =
     requireRole(req, Role.Supervisor) {
+      val user = getCurrentUser(req)
       val form = parseForm(req)
       val id = form.getOrElse("id", "").trim
       val name = form.getOrElse("name", "").trim
       val rawVariety = form.getOrElse("cropVariety", "").trim
-      val author = form.getOrElse("author", "Penyuluh Pertanian").trim
+      val author = user.map(_.fullName).getOrElse(form.getOrElse("author", "Mandor Kebun").trim)
 
       if id.isEmpty || name.isEmpty || rawVariety.isEmpty then
         cask.Redirect("/kelola-panduan?alertKind=danger&alertMsg=Semua+data+panduan+wajib+diisi.")
@@ -287,13 +364,14 @@ object Main extends cask.MainRoutes:
   @cask.get("/pemeriksaan-perubahan")
   def pemeriksaanPerubahan(req: cask.Request, alertKind: Option[String] = None, alertMsg: Option[String] = None): cask.Response[String] =
     requireRole(req, Role.Supervisor) {
+      val user = getCurrentUser(req)
       val drafts = db.getDraftsAwaitingReview().map { case (g, currRev, pubOpt) =>
         val baseSnapshot = pubOpt.flatMap(p => db.getRevision(p.revisionId)).map(_.snapshot).getOrElse(currRev.snapshot)
         val diffSummary = VerdantCore.computeReadableDiff(baseSnapshot, currRev.snapshot)
         (g, currRev, Some(baseSnapshot), diffSummary, pubOpt)
       }
       val alert = for { k <- alertKind; m <- alertMsg } yield (k, m)
-      htmlResponse(Views.layout("Pemeriksaan Perubahan", "pemeriksaan-perubahan", "supervisor", alert)(
+      htmlResponse(Views.layout("Pemeriksaan Perubahan", "pemeriksaan-perubahan", "supervisor", alert, user)(
         Views.supervisorPemeriksaanPerubahanView(drafts)
       ))
     }
@@ -301,8 +379,9 @@ object Main extends cask.MainRoutes:
   @cask.post("/panduan/:id/perbarui")
   def perbaruiDrafPanduan(id: String, req: cask.Request): cask.Response[String] =
     requireRole(req, Role.Supervisor) {
+      val user = getCurrentUser(req)
       val form = parseForm(req)
-      val author = form.getOrElse("author", "Mandor Kebun").trim
+      val author = user.map(_.fullName).getOrElse(form.getOrElse("author", "Mandor Kebun").trim)
       val changeNotes = form.getOrElse("changeNotes", "Penyesuaian rekomendasi budidaya").trim
       val targetStageName = form.getOrElse("stageName", "").trim
       val targetParamName = form.getOrElse("paramName", "").trim
@@ -344,6 +423,7 @@ object Main extends cask.MainRoutes:
   @cask.get("/panduan/:id/tinjau")
   def tinjauPerubahan(id: String, req: cask.Request, alertKind: Option[String] = None, alertMsg: Option[String] = None): cask.Response[String] =
     requireRole(req, Role.Supervisor) {
+      val user = getCurrentUser(req)
       db.getGuide(id) match
         case None => cask.Redirect("/kelola-panduan")
         case Some(guide) =>
@@ -358,7 +438,7 @@ object Main extends cask.MainRoutes:
               val diffSummary = VerdantCore.computeReadableDiff(baseSnapshot, currRev.snapshot)
               val alert = for { k <- alertKind; m <- alertMsg } yield (k, m)
 
-              htmlResponse(Views.layout("Tinjauan Perubahan", "pemeriksaan-perubahan", "supervisor", alert)(
+              htmlResponse(Views.layout("Tinjauan Perubahan", "pemeriksaan-perubahan", "supervisor", alert, user)(
                 Views.supervisorTinjauPerubahanView(guide, currRev, None, diffSummary, pubOpt)
               ))
     }
@@ -366,10 +446,11 @@ object Main extends cask.MainRoutes:
   @cask.post("/panduan/:id/terbitkan")
   def terbitkanPanduan(id: String, req: cask.Request): cask.Response[String] =
     requireRole(req, Role.Supervisor) {
+      val user = getCurrentUser(req)
       val form = parseForm(req)
       val revisionId = form.getOrElse("revisionId", "").trim
       val editionTag = form.getOrElse("editionTag", "").trim
-      val approvedBy = form.getOrElse("approvedBy", "").trim
+      val approvedBy = user.map(_.fullName).getOrElse(form.getOrElse("approvedBy", "").trim)
       val notes = form.getOrElse("notes", "Disetujui untuk operasional kebun").trim
 
       (for {
@@ -386,8 +467,9 @@ object Main extends cask.MainRoutes:
   @cask.post("/panduan/:id/tolak")
   def tolakDrafPanduan(id: String, req: cask.Request): cask.Response[String] =
     requireRole(req, Role.Supervisor) {
+      val user = getCurrentUser(req)
       val form = parseForm(req)
-      val rejectedBy = form.getOrElse("rejectedBy", "Mandor Pemeriksa").trim
+      val rejectedBy = user.map(_.fullName).getOrElse(form.getOrElse("rejectedBy", "Mandor Pemeriksa").trim)
       val reason = form.getOrElse("reason", "Takaran belum sesuai kebutuhan").trim
 
       db.rejectDraft(id, rejectedBy, reason) match
@@ -404,12 +486,13 @@ object Main extends cask.MainRoutes:
   @cask.get("/riwayat")
   def riwayat(req: cask.Request, alertKind: Option[String] = None, alertMsg: Option[String] = None): cask.Response[String] =
     requireRole(req, Role.Supervisor) {
+      val user = getCurrentUser(req)
       val guides = db.listGuides()
       val allRevisions = guides.flatMap(g => db.listRevisionsForGuide(g.id))
       val publishedEditions = db.listPublishedGuides()
       val alert = for { k <- alertKind; m <- alertMsg } yield (k, m)
 
-      htmlResponse(Views.layout("Riwayat Panduan", "riwayat", "supervisor", alert)(
+      htmlResponse(Views.layout("Riwayat Panduan", "riwayat", "supervisor", alert, user)(
         Views.supervisorRiwayatView(allRevisions, publishedEditions)
       ))
     }
@@ -417,9 +500,10 @@ object Main extends cask.MainRoutes:
   @cask.post("/riwayat/pulihkan")
   def pulihkanRevisi(req: cask.Request): cask.Response[String] =
     requireRole(req, Role.Supervisor) {
+      val user = getCurrentUser(req)
       val form = parseForm(req)
       val targetRevisionId = form.getOrElse("targetRevisionId", "").trim
-      val author = form.getOrElse("author", "Mandor Pemulih").trim
+      val author = user.map(_.fullName).getOrElse(form.getOrElse("author", "Mandor Pemulih").trim)
 
       (for {
         targetRev <- db.getRevision(targetRevisionId).toRight("Revisi target tidak ditemukan.")
@@ -445,25 +529,27 @@ object Main extends cask.MainRoutes:
     alertKind: Option[String] = None,
     alertMsg: Option[String] = None
   ): cask.Response[String] =
+    val user = getCurrentUser(req)
     val filterCode = periodCode.filter(_.trim.nonEmpty)
     val activities = db.listActivities(filterCode)
     val periods = db.listPeriods()
     val alert = for { k <- alertKind; m <- alertMsg } yield (k, m)
 
-    htmlResponse(Views.layout("Catatan Budidaya", "catatan", getRole(req).toString.toLowerCase, alert)(
-      Views.catatanView(activities, periods, filterCode)
+    htmlResponse(Views.layout("Catatan Budidaya", "catatan", getRole(req).toString.toLowerCase, alert, user)(
+      Views.catatanView(activities, periods, filterCode, user)
     ))
 
   @cask.post("/catatan/tambah")
   def tambahCatatan(req: cask.Request): cask.Response[String] =
     requireRole(req, Role.Farmer) {
+      val user = getCurrentUser(req)
       val form = parseForm(req)
       val periodCode = form.getOrElse("periodCode", "").trim
       val activityType = form.getOrElse("activityType", "").trim
       val activityDate = form.getOrElse("activityDate", "").trim
       val notes = form.getOrElse("notes", "").trim
       val quantity = form.get("quantity").filter(_.trim.nonEmpty)
-      val farmerName = form.getOrElse("farmerName", "Petani").trim
+      val farmerName = user.map(_.fullName).getOrElse(form.getOrElse("farmerName", "Petani").trim)
 
       if periodCode.isEmpty || activityType.isEmpty || activityDate.isEmpty || notes.isEmpty then
         cask.Redirect("/catatan?alertKind=danger&alertMsg=Masa+tanam,+jenis+kegiatan,+tanggal,+dan+catatan+wajib+diisi.")

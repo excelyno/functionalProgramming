@@ -2,19 +2,14 @@ package verdant.shell.views
 
 import scalatags.Text.all.*
 import scalatags.Text.tags2.{nav, title, style as cssStyle}
+import verdant.core.User
 
 /**
- * ============================================================================
- * LAYOUT VIEW: Kerangka Master HTML, Navigasi, CSS Nyaman di Mata, & Role Switcher
- * ============================================================================
- * 
- * Modul ini mengatur kerangka visual luar yang nyaman di mata (eyestrain-free):
- * - Menggunakan palet hijau alami (#1b4332 / #2d6a4f), latar soft slate (#f8fafc),
- *   dan kartu berbayangan lembut (#ffffff border #e2e8f0).
- * - Menegaskan konsep sederhana:
- *   1. MANDOR: Membuat & menguji "Cetakan Budidaya (Master SOP)".
- *   2. PETANI: Menerapkan cetakan ke lahan & mencatat log harian.
- *   3. CATATAN KEKAL: Log kegiatan petani bersifat permanen (anti-hapus ala Git).
+ * Kerangka halaman: head, CSS global, navbar, navigasi bawah (HP), dan peran aktif.
+ *
+ * Catatan CSS: `badge-git-immutable`, `badge-cetakan`, `panel-verdant`, dan
+ * `section-label` masih didefinisikan karena view mandor/jurnal belum semuanya
+ * dirapikan. Hapus setelah tidak ada yang memakai.
  */
 trait LayoutView:
 
@@ -25,18 +20,24 @@ trait LayoutView:
     pageTitle: String,
     activeNav: String,
     currentRole: String = "farmer",
-    alert: Option[(String, String)] = None
+    alert: Option[(String, String)] = None,
+    currentUser: Option[User] = None
   )(pageContent: Modifier*): String =
-    val isSupervisor = currentRole.equalsIgnoreCase("supervisor") || currentRole.equalsIgnoreCase("mandor")
+    val effectiveRole = currentUser.map(u => if u.isSupervisor then "supervisor" else "farmer").getOrElse(currentRole)
+    val isSupervisor = effectiveRole.equalsIgnoreCase("supervisor") || effectiveRole.equalsIgnoreCase("mandor")
     val roleLabel = if isSupervisor then "Mandor" else "Petani"
     val switchTargetRole = if isSupervisor then "farmer" else "supervisor"
-    val switchTargetLabel = if isSupervisor then "Ganti ke Mode Petani" else "Ganti ke Mode Mandor"
-    val switchTargetIcon = if isSupervisor then "bi-person-check" else "bi-pencil-square"
+    val switchTargetLabel = if isSupervisor then "Mode petani" else "Mode mandor"
+
+    def navLink(key: String, target: String, text: String): Modifier =
+      li(cls := "nav-item")(
+        a(cls := s"nav-link nav-link-verdant ${if activeNav == key then "active" else ""}", href := target)(text)
+      )
 
     "<!DOCTYPE html>" + html(lang := "id")(
       head(
         meta(charset := "utf-8"),
-        meta(name := "viewport", content := "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"),
+        meta(name := "viewport", content := "width=device-width, initial-scale=1"),
         title(s"$pageTitle · Verdant Pertanian ($roleLabel)"),
         link(
           rel := "stylesheet",
@@ -49,133 +50,109 @@ trait LayoutView:
         cssStyle(
           """
           :root {
-            --verdant-primary: #1b4332;
-            --verdant-primary-hover: #2d6a4f;
-            --verdant-accent: #52b788;
-            --verdant-canvas: #f8fafc;
+            --verdant-primary: #24512f;
+            --verdant-primary-hover: #2d6339;
+            --verdant-canvas: #f5f6f3;
             --verdant-card-bg: #ffffff;
-            --verdant-border: #e2e8f0;
-            --verdant-border-subtle: #f1f5f9;
-            --verdant-text: #0f172a;
-            --verdant-text-muted: #64748b;
-            --verdant-text-subtle: #94a3b8;
-            --verdant-git-badge-bg: #e0e7ff;
-            --verdant-git-badge-text: #3730a3;
+            --verdant-border: #d9ddd7;
+            --verdant-border-subtle: #eceee9;
+            --verdant-text: #1d261f;
+            --verdant-text-muted: #5f6b61;
           }
           body {
             background-color: var(--verdant-canvas);
             color: var(--verdant-text);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             font-size: 14.5px;
-            line-height: 1.6;
-            padding-bottom: 80px;
+            line-height: 1.55;
           }
+          @media (max-width: 991.98px) { body { padding-bottom: 72px; } }
+
+          a { color: var(--verdant-primary); }
+          :focus-visible { outline: 2px solid var(--verdant-primary); outline-offset: 2px; }
+
+          /* Navbar */
           .navbar-verdant {
             background-color: var(--verdant-primary);
-            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.12);
           }
           .nav-link-verdant {
-            color: rgba(255, 255, 255, 0.88) !important;
+            color: rgba(255, 255, 255, 0.85) !important;
+            font-size: 13.5px;
+            padding: 6px 12px !important;
+            border-radius: 4px;
+          }
+          .nav-link-verdant:hover { color: #fff !important; background-color: rgba(255, 255, 255, 0.10); }
+          .nav-link-verdant.active { color: #fff !important; background-color: rgba(255, 255, 255, 0.16); }
+
+          /* Tombol */
+          .btn-verdant, .btn-verdant-outline {
             font-size: 13.5px;
             font-weight: 500;
-            padding: 7px 13px !important;
             border-radius: 6px;
-            transition: all 0.15s ease-in-out;
-          }
-          .nav-link-verdant.active, .nav-link-verdant:hover {
-            color: #ffffff !important;
-            background-color: rgba(255, 255, 255, 0.15);
-          }
-          .btn-verdant {
-            background-color: var(--verdant-primary);
-            color: #ffffff;
-            font-size: 13.5px;
-            font-weight: 500;
-            border: 1px solid var(--verdant-primary);
-            border-radius: 7px;
-            padding: 7px 16px;
+            padding: 6px 14px;
             text-decoration: none;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-            transition: all 0.15s ease-in-out;
+            transition: background-color .12s, border-color .12s, color .12s;
           }
-          .btn-verdant:hover {
-            background-color: var(--verdant-primary-hover);
-            color: #ffffff;
-            border-color: var(--verdant-primary-hover);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          .btn-verdant { background-color: var(--verdant-primary); color: #fff; border: 1px solid var(--verdant-primary); }
+          .btn-verdant:hover { background-color: var(--verdant-primary-hover); border-color: var(--verdant-primary-hover); color: #fff; }
+          .btn-verdant-outline { background-color: #fff; color: var(--verdant-primary); border: 1px solid var(--verdant-border); }
+          .btn-verdant-outline:hover { background-color: var(--verdant-border-subtle); border-color: #bfc5bc; color: var(--verdant-primary); }
+          .btn-sm.btn-verdant, .btn-sm.btn-verdant-outline { padding: 4px 12px; font-size: 13px; }
+
+          /* Bootstrap "success" dibuat mengikuti warna utama (pill pilihan, link) */
+          .btn-outline-success {
+            --bs-btn-color: var(--verdant-primary);
+            --bs-btn-border-color: var(--verdant-border);
+            --bs-btn-hover-color: var(--verdant-primary);
+            --bs-btn-hover-bg: var(--verdant-border-subtle);
+            --bs-btn-hover-border-color: #bfc5bc;
+            --bs-btn-active-color: #fff;
+            --bs-btn-active-bg: var(--verdant-primary);
+            --bs-btn-active-border-color: var(--verdant-primary);
           }
-          .btn-verdant-outline {
-            background-color: #ffffff;
-            color: var(--verdant-primary);
-            font-size: 13.5px;
-            font-weight: 500;
-            border: 1px solid var(--verdant-border);
-            border-radius: 7px;
-            padding: 7px 16px;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.02);
-            transition: all 0.15s ease-in-out;
+          .text-success { color: var(--verdant-primary) !important; }
+          .form-control:focus, .form-select:focus {
+            border-color: var(--verdant-primary);
+            box-shadow: 0 0 0 3px rgba(36, 81, 47, 0.15);
           }
-          .btn-verdant-outline:hover {
-            background-color: var(--verdant-border-subtle);
-            color: var(--verdant-primary-hover);
-            border-color: #cbd5e1;
-          }
+          .modal-header, .modal-footer { border-color: var(--verdant-border-subtle); }
+
+          /* Dipertahankan untuk view yang belum dirapikan */
           .panel-verdant {
             border: 1px solid var(--verdant-border);
-            border-radius: 10px;
-            padding: 20px;
+            border-radius: 6px;
+            padding: 16px;
             background-color: var(--verdant-card-bg);
-            box-shadow: 0 1px 3px rgba(0,0,0,0.03);
           }
           .section-label {
-            font-size: 12.5px;
+            font-size: 13px;
             font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-            color: var(--verdant-text-muted);
+            color: var(--verdant-text);
           }
-          .badge-git-immutable {
-            background-color: var(--verdant-git-badge-bg);
-            color: var(--verdant-git-badge-text);
-            border: 1px solid #c7d2fe;
+          .badge-git-immutable, .badge-cetakan {
             font-size: 11px;
-            font-weight: 600;
-            padding: 3px 8px;
-            border-radius: 6px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            color: var(--verdant-text-muted);
             display: inline-flex;
             align-items: center;
             gap: 4px;
           }
-          .badge-cetakan {
-            background-color: #ecfdf5;
-            color: #065f46;
-            border: 1px solid #a7f3d0;
-            font-size: 11px;
-            font-weight: 600;
-            padding: 3px 8px;
-            border-radius: 6px;
-          }
+
+          /* Navigasi bawah (HP) */
           .bottom-nav {
             position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 62px;
-            background-color: #ffffff;
+            bottom: 0; left: 0; right: 0;
+            height: 58px;
+            background-color: #fff;
             border-top: 1px solid var(--verdant-border);
             display: flex;
             align-items: center;
             justify-content: space-around;
             z-index: 1030;
-            box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.04);
           }
           .bottom-nav a {
             color: var(--verdant-text-muted);
@@ -184,74 +161,78 @@ trait LayoutView:
             flex-direction: column;
             align-items: center;
             font-size: 11px;
-            font-weight: 500;
           }
-          .bottom-nav a.active {
-            color: var(--verdant-primary);
-            font-weight: 600;
-          }
-          .bottom-nav i {
-            font-size: 20px;
-            margin-bottom: 2px;
-          }
+          .bottom-nav a.active { color: var(--verdant-primary); font-weight: 600; }
+          .bottom-nav i { font-size: 19px; margin-bottom: 1px; }
           """
         )
       ),
       body(
-        // Top Navbar
         tag("header")(
           nav(cls := "navbar navbar-expand-lg navbar-dark navbar-verdant py-2")(
             div(cls := "container")(
-              a(cls := "navbar-brand fw-bold d-flex align-items-center gap-2", href := "/")(
-                i(cls := "bi bi-sprout text-warning fs-5"),
-                span("Verdant Pertanian")
-              ),
+              a(cls := "navbar-brand fw-semibold", href := "/", "Verdant Pertanian"),
               button(
                 cls := "navbar-toggler border-0",
                 `type` := "button",
                 data("bs-toggle") := "collapse",
-                data("bs-target") := "#navbarVerdantContent"
+                data("bs-target") := "#navbarVerdantContent",
+                attr("aria-label") := "Buka menu"
               )(span(cls := "navbar-toggler-icon")),
               div(cls := "collapse navbar-collapse", id := "navbarVerdantContent")(
                 ul(cls := "navbar-nav me-auto mb-2 mb-lg-0")(
-                  li(cls := "nav-item")(
-                    a(cls := s"nav-link nav-link-verdant ${if activeNav == "beranda" then "active" else ""}", href := "/")("Beranda")
-                  ),
+                  navLink("beranda", "/", "Beranda"),
                   if !isSupervisor then
                     Seq(
-                      li(cls := "nav-item")(
-                        a(cls := s"nav-link nav-link-verdant ${if activeNav == "masa-tanam" then "active" else ""}", href := "/masa-tanam")("Lahan Saya (Cetakan Terkunci)")
-                      ),
-                      li(cls := "nav-item")(
-                        a(cls := s"nav-link nav-link-verdant ${if activeNav == "catatan" then "active" else ""}", href := "/catatan")("Buku Catatan Lahan (Log Abadi)")
-                      ),
-                      li(cls := "nav-item")(
-                        a(cls := s"nav-link nav-link-verdant ${if activeNav == "panduan" then "active" else ""}", href := "/panduan")("Katalog Cetakan Mandor")
-                      )
+                      navLink("masa-tanam", "/masa-tanam", "Lahan"),
+                      navLink("catatan", "/catatan", "Catatan"),
+                      navLink("panduan", "/panduan", "Cetakan")
                     )
                   else
                     Seq(
-                      li(cls := "nav-item")(
-                        a(cls := s"nav-link nav-link-verdant ${if activeNav == "kelola-panduan" then "active" else ""}", href := "/kelola-panduan")("Kelola Cetakan Budidaya")
-                      ),
-                      li(cls := "nav-item")(
-                        a(cls := s"nav-link nav-link-verdant ${if activeNav == "pemeriksaan-perubahan" then "active" else ""}", href := "/pemeriksaan-perubahan")("Periksa Perubahan Draf")
-                      ),
-                      li(cls := "nav-item")(
-                        a(cls := s"nav-link nav-link-verdant ${if activeNav == "riwayat" then "active" else ""}", href := "/riwayat")("Riwayat & Silsilah Cetakan")
-                      )
+                      navLink("kelola-panduan", "/kelola-panduan", "Kelola cetakan"),
+                      navLink("pemeriksaan-perubahan", "/pemeriksaan-perubahan", "Periksa perubahan"),
+                      navLink("riwayat", "/riwayat", "Riwayat")
                     )
                 ),
-                // Role Switcher in Navbar
                 div(cls := "d-flex align-items-center gap-2 mt-2 mt-lg-0")(
-                  span(cls := "small text-white-50 d-none d-xl-inline me-1", s"Sedang Aktif: $roleLabel"),
+                  currentUser match
+                    case Some(u) =>
+                      div(cls := "d-flex align-items-center gap-2")(
+                        div(cls := "text-end d-none d-sm-block text-white", style := "line-height: 1.2;")(
+                          div(cls := "fw-semibold", style := "font-size: 13px;", u.fullName),
+                          span(cls := "text-white-50", style := "font-size: 11px;", if u.isSupervisor then "Mandor" else "Petani")
+                        ),
+                        a(
+                          href := "/logout",
+                          cls := "btn btn-sm btn-outline-light py-1 px-2",
+                          attr("title") := "Keluar dari sesi",
+                          style := "font-size: 12.5px;"
+                        )(
+                          i(cls := "bi bi-box-arrow-right me-1"),
+                          "Keluar"
+                        )
+                      )
+                    case None =>
+                      div(cls := "d-flex align-items-center gap-2")(
+                        a(
+                          href := "/login",
+                          cls := "btn btn-sm btn-light py-1 px-3 fw-semibold text-dark",
+                          style := "font-size: 13px;"
+                        )(
+                          i(cls := "bi bi-box-arrow-in-right me-1"),
+                          "Masuk"
+                        )
+                      )
+                  ,
                   a(
                     href := s"/role?set=$switchTargetRole&redirect=/",
-                    cls := "btn btn-sm btn-outline-light py-1 px-3 d-flex align-items-center gap-1",
-                    style := "font-size: 13px; border-radius: 6px;"
+                    cls := "btn btn-sm btn-outline-light py-1 px-2 d-none d-md-inline-flex",
+                    attr("title") := "Ganti mode cepat",
+                    style := "font-size: 12px;"
                   )(
-                    i(cls := s"bi $switchTargetIcon"),
-                    span(switchTargetLabel)
+                    i(cls := "bi bi-arrow-repeat me-1"),
+                    switchTargetLabel
                   )
                 )
               )
@@ -259,15 +240,14 @@ trait LayoutView:
           )
         ),
 
-        // Main Container
         div(cls := "container py-3 py-md-4")(
           alert match
             case Some((kind, msg)) =>
-              val borderClass = if kind == "success" then "border-success bg-success-subtle text-success-emphasis" else "border-danger bg-danger-subtle text-danger-emphasis"
-              div(cls := s"alert $borderClass alert-dismissible fade show mb-3 border py-2 px-3 small rounded-3", role := "alert")(
+              val tone = if kind == "success" then "border-success bg-success-subtle text-success-emphasis" else "border-danger bg-danger-subtle text-danger-emphasis"
+              div(cls := s"alert $tone alert-dismissible fade show mb-3 border py-2 px-3 small rounded-2", role := "alert")(
                 div(cls := "d-flex align-items-center justify-content-between")(
                   div(raw(msg.replace("\n", "<br/>"))),
-                  button(`type` := "button", cls := "btn-close small p-2", data("bs-dismiss") := "alert")
+                  button(`type` := "button", cls := "btn-close small p-2", data("bs-dismiss") := "alert", attr("aria-label") := "Tutup")
                 )
               )
             case None => modifier()
@@ -275,49 +255,21 @@ trait LayoutView:
           pageContent
         ),
 
-        // Mobile Bottom Navigation Bar (Role-Specific)
         div(cls := "bottom-nav d-lg-none")(
           if !isSupervisor then
             Seq(
-              a(href := "/", cls := (if activeNav == "beranda" then "active" else ""))(
-                i(cls := "bi bi-house"),
-                span("Beranda")
-              ),
-              a(href := "/masa-tanam", cls := (if activeNav == "masa-tanam" then "active" else ""))(
-                i(cls := "bi bi-calendar3"),
-                span("Lahan")
-              ),
-              a(href := "/catatan", cls := (if activeNav == "catatan" then "active" else ""))(
-                i(cls := "bi bi-journal-text"),
-                span("Buku Log")
-              ),
-              a(href := "/role?set=supervisor&redirect=/", cls := "")(
-                i(cls := "bi bi-shield-check"),
-                span("Ke Mandor")
-              )
+              a(href := "/", cls := (if activeNav == "beranda" then "active" else ""))(i(cls := "bi bi-house"), span("Beranda")),
+              a(href := "/masa-tanam", cls := (if activeNav == "masa-tanam" then "active" else ""))(i(cls := "bi bi-calendar3"), span("Lahan")),
+              a(href := "/catatan", cls := (if activeNav == "catatan" then "active" else ""))(i(cls := "bi bi-journal-text"), span("Catatan")),
+              a(href := "/role?set=supervisor&redirect=/")(i(cls := "bi bi-arrow-repeat"), span("Mandor"))
             )
           else
             Seq(
-              a(href := "/", cls := (if activeNav == "beranda" then "active" else ""))(
-                i(cls := "bi bi-house"),
-                span("Beranda")
-              ),
-              a(href := "/kelola-panduan", cls := (if activeNav == "kelola-panduan" then "active" else ""))(
-                i(cls := "bi bi-journal-check"),
-                span("Cetakan")
-              ),
-              a(href := "/pemeriksaan-perubahan", cls := (if activeNav == "pemeriksaan-perubahan" then "active" else ""))(
-                i(cls := "bi bi-arrow-left-right"),
-                span("Perubahan")
-              ),
-              a(href := "/riwayat", cls := (if activeNav == "riwayat" then "active" else ""))(
-                i(cls := "bi bi-clock-history"),
-                span("Riwayat")
-              ),
-              a(href := "/role?set=farmer&redirect=/", cls := "")(
-                i(cls := "bi bi-person"),
-                span("Ke Petani")
-              )
+              a(href := "/", cls := (if activeNav == "beranda" then "active" else ""))(i(cls := "bi bi-house"), span("Beranda")),
+              a(href := "/kelola-panduan", cls := (if activeNav == "kelola-panduan" then "active" else ""))(i(cls := "bi bi-journal-check"), span("Cetakan")),
+              a(href := "/pemeriksaan-perubahan", cls := (if activeNav == "pemeriksaan-perubahan" then "active" else ""))(i(cls := "bi bi-arrow-left-right"), span("Perubahan")),
+              a(href := "/riwayat", cls := (if activeNav == "riwayat" then "active" else ""))(i(cls := "bi bi-clock-history"), span("Riwayat")),
+              a(href := "/role?set=farmer&redirect=/")(i(cls := "bi bi-arrow-repeat"), span("Petani"))
             )
         ),
 
@@ -329,30 +281,23 @@ trait LayoutView:
   // 403 FORBIDDEN VIEW
   // ==========================================================================
   def forbiddenView(requiredRole: String, currentRole: String): Modifier =
-    div(cls := "py-5 text-center")(
-      div(cls := "p-4 p-md-5 bg-white border rounded-4 shadow-sm mx-auto", style := "max-width: 580px;")(
-        div(cls := "text-danger mb-3")(
-          i(cls := "bi bi-shield-lock-fill", style := "font-size: 3rem;")
-        ),
-        h1(cls := "h4 fw-bold text-dark mb-2", "Akses Ditolak (403 Forbidden)"),
-        p(cls := "text-secondary mb-3",
-          s"Halaman atau tindakan ini memerlukan hak akses peran ",
+    div(cls := "py-5")(
+      div(cls := "p-4 p-md-5 bg-white border rounded-2 mx-auto", style := "max-width: 520px;")(
+        h1(cls := "h5 fw-semibold text-dark mb-2", "Akses ditolak (403)"),
+        p(cls := "text-secondary mb-4",
+          "Halaman ini hanya untuk peran ",
           strong(cls := "text-dark", requiredRole),
-          s". Anda saat ini menggunakan mode ",
+          ". Anda sedang memakai mode ",
           strong(cls := "text-dark", currentRole),
-          "."
+          ". Peran bisa diganti kapan saja."
         ),
-        div(cls := "p-3 bg-light rounded-3 text-start small text-muted mb-4 border")(
-          strong(cls := "text-dark d-block mb-1", "💡 Pergantian Peran Praktis:"),
-          "Untuk mempermudah simulasi, Anda dapat langsung beralih peran kapan saja dengan tombol di bawah ini."
-        ),
-        div(cls := "d-flex justify-content-center gap-2 flex-wrap")(
+        div(cls := "d-flex gap-2 flex-wrap")(
           if requiredRole.toLowerCase.contains("mandor") || requiredRole.toLowerCase.contains("supervisor") then
-            a(cls := "btn btn-verdant", href := "/role?set=supervisor&redirect=/", "Beralih ke Mode Mandor Sekarang")
+            a(cls := "btn btn-verdant", href := "/role?set=supervisor&redirect=/", "Ganti ke mode mandor")
           else
-            a(cls := "btn btn-verdant", href := "/role?set=farmer&redirect=/", "Beralih ke Mode Petani Sekarang")
+            a(cls := "btn btn-verdant", href := "/role?set=farmer&redirect=/", "Ganti ke mode petani")
           ,
-          a(cls := "btn btn-verdant-outline", href := "/", "Kembali ke Beranda")
+          a(cls := "btn btn-verdant-outline", href := "/", "Kembali ke beranda")
         )
       )
     )
