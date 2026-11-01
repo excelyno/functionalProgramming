@@ -745,7 +745,7 @@ class Database(dbPath: String = "verdant.db"):
 
       createGuide(
         id = "panduan-cabai-02",
-        name = "SOP Budidaya Cabai Rawit Merah Intensif",
+        name = "Cetakan Budidaya Cabai (Lahan 1)",
         cropVariety = "Cabai Rawit Merah Varietas Ori 212",
         initialSnapshot = cabaiGuide,
         author = "Hj. Nuraini, S.P. (Mandor Kebun Hortikultura)"
@@ -757,7 +757,7 @@ class Database(dbPath: String = "verdant.db"):
         editionTag = "Edisi 2026.1 - Standar GAP",
         revisionId = cabaiRev.id,
         approvedBy = "H. Suwandi (Kepala Kebun)",
-        notes = "Disetujui untuk musim tanam gadu di lahan terbuka."
+        notes = "Disetujui untuk musim tanam di Lahan 1."
       )
 
       // 3. Masa Tanam Aktif
@@ -772,7 +772,7 @@ class Database(dbPath: String = "verdant.db"):
         code = "MT-2026-CABAI-02",
         guideId = "panduan-cabai-02",
         publishedEdition = "Edisi 2026.1 - Standar GAP",
-        plotName = "Lahan Terbuka Petak Selatan"
+        plotName = "Lahan 1 (Cabai Rawit)"
       )
 
       // 4. Catatan Kegiatan Lapangan
@@ -811,7 +811,7 @@ class Database(dbPath: String = "verdant.db"):
         periodCode = "MT-2026-CABAI-02",
         activityType = "Pemupukan",
         activityDate = "2026-10-25",
-        notes = "Pemupukan susulan NPK 16-16-16 dikocorkan pada lubang tanam samping mulsa.",
+        notes = "Ngasi pupuk NPK 50 kg pada tanaman cabai di Lahan 1.",
         quantity = Some("50 kg NPK"),
         farmerName = "Pak Slamet (Petani Penggarap)"
       )
