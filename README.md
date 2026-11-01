@@ -11,13 +11,14 @@ Verdant memisahkan kebutuhan dua kelompok pengguna tanpa membingungkan petani de
 
 1. **Petani (Penyiram, Pemupuk, Pemanen di Lapangan):**
    - Mengakses aplikasi melalui ponsel pintar (*smartphone*).
-   - Mencatat kegiatan harian di kebun dengan 1 ketukan tombol besar (**"Catat Kegiatan Baru"**).
+   - Mencatat kegiatan harian di kebun dengan 1 ketukan tombol besar (**"Catat Kegiatan"**).
    - Membaca instruksi dan takaran resmi tahap budidaya secara jelas dalam bahasa Indonesia.
+   - Peringatan dini otomatis jika takaran pupuk/air melebihi rentang aman anjuran resmi.
 2. **Mandor & Penyuluh Pertanian (Pengawas & Pembuat Kebijakan):**
-   - Memperbarui rekomendasi takaran pupuk atau durasi tahap.
+   - Memperbarui rekomendasi takaran pupuk atau durasi tahap secara aman (*non-destructive*).
    - Meninjau ringkasan perubahan dalam bahasa manusia (**"Apa yang berubah?"**).
-   - Menyetujui dan menerbitkan edisi panduan resmi baru (*Release*) untuk masa tanam mendatang.
-   - Memeriksa silsilah perubahan dan memulihkan (*Revert*) panduan jika diperlukan.
+   - Menyetujui dan menerbitkan edisi panduan resmi baru (*Release*) untuk masa tanam mendatang, atau menolak draf (*Reject*).
+   - Memeriksa silsilah perubahan dan memulihkan (*Revert/Rollback*) panduan ke versi terdahulu jika diperlukan.
 
 ---
 
@@ -26,7 +27,7 @@ Verdant memisahkan kebutuhan dua kelompok pengguna tanpa membingungkan petani de
 - **🏠 Beranda:** Dasbor praktis yang memprioritaskan masa tanam aktif, tombol aksi cepat *Catat Kegiatan*, tips agronomi hari ini, dan rangkuman kegiatan terkini petani.
 - **📝 Catatan Budidaya:** Jurnal harian seluruh kegiatan petani di petak lahan dengan penyaringan (*filter*) berdasarkan masa tanam.
 - **📖 Panduan Budidaya:** Katalog panduan budidaya per komoditas, petunjuk langkah demi langkah, serta area mandor untuk memperbarui draf panduan.
-- **📅 Masa Tanam:** Pengelolaan siklus penanaman di lahan/greenhouse tertentu yang terkunci secara permanen pada edisi panduan resmi yang berlaku.
+- **📅 Masa Tanam:** Pengelolaan siklus penanaman di lahan/greenhouse tertentu yang terkunci secara permanen pada edisi panduan resmi yang berlaku (*Batch Traceability*).
 - **🕒 Riwayat:** Riwayat penerbitan edisi resmi dan silsilah revisi dengan tombol pemulihan versi (*Revert*).
 
 ---
@@ -63,18 +64,48 @@ Seluruh logika inti Verdant mengikuti arsitektur **Functional Core / Imperative 
 
 ---
 
+## 🏛️ Arsitektur Modular Tampilan (Views Architecture)
+
+Agar kode mudah dipelajari oleh pengembang yang baru mengenal Scala, antarmuka web yang sebelumnya menumpuk 1.600+ baris dipecah secara modular menggunakan teknik **Trait Mixin**:
+
+```
+Browser Pengguna (Klik Menu / Form POST)
+              │
+              ▼
+    1. Main.scala (HTTP Controller / Routing Cask)
+       - Role Verification (Farmer vs Supervisor)
+              │
+              ▼
+    2. Database.scala (SQLite) <───> VerdantCore.scala (FP Logic Murni)
+              │
+              ▼
+    3. Views (Modul UI di verdant/shell/views/)
+       ├── LayoutView.scala     (Master layout, CSS Bootstrap, Navbar, 403)
+       ├── FarmerViews.scala    (Beranda Petani, Masa Tanam, Detail Kepatuhan, Panduan Resmi)
+       ├── SupervisorViews.scala(Kelola SOP, Editor Draf, Diff Perubahan, Riwayat Silsilah)
+       ├── JournalViews.scala   (Jurnal rekapitulasi catatan harian)
+       └── SharedModals.scala   (Pop-up form Catat Kegiatan, Buka Masa Tanam, SOP Baru)
+              │
+              ▼
+    Browser Menerima HTML Bersih (HTTP 200 OK)
+```
+
+File `Views.scala` bertindak sebagai *Single Facade* yang menggabungkan seluruh trait modular di atas, sehingga pemanggilan dari `Main.scala` tetap konsisten dan rapi.
+
+---
+
 ## 🛠️ Panduan Menjalankan Aplikasi & Pengujian
 
 ### Prasyarat
 - Java Development Kit (JDK) 17 atau 21
-- sbt 1.10.x (atau menggunakan `sbt` yang terpasang)
+- sbt 1.10.x (atau menggunakan `sbt` yang terpasang di sistem)
 
 ### 1. Menjalankan Seluruh Unit & Integration Test
 Untuk memverifikasi kebenaran fungsional core dan persistensi database:
 ```bash
 sbt test
 ```
-*Hasil yang diharapkan: 16 test lulus tanpa galat (Passed: Total 16, Failed 0, Errors 0).*
+*Hasil yang diharapkan: 18 test lulus 100% tanpa galat (`Passed: Total 18, Failed 0, Errors 0`).*
 
 ### 2. Menjalankan Aplikasi Lokal
 Untuk memulai server web Cask:
@@ -83,9 +114,9 @@ sbt run
 ```
 Aplikasi akan aktif di: **[http://127.0.0.1:8080](http://127.0.0.1:8080)**.
 
-### 3. Demonstrasi 2 Alur Utama:
-- **Alur Petani (Catat Kegiatan):** Buka Beranda $\to$ Klik tombol besar *"Catat Kegiatan Baru"* $\to$ Pilih Masa Tanam (`MT-2026-TOMAT-01`), Jenis Kegiatan (*Pemupukan*), isi takaran dan catatan $\to$ Klik Simpan $\to$ Muncul konfirmasi hijau dan catatan tampil di jurnal.
-- **Alur Mandor (Perbarui & Terbitkan Panduan):** Buka Panduan Budidaya $\to$ Buka *Panduan Tomat* $\to$ Buka area mandor *"Ubah Panduan"* $\to$ Ubah nilai target $\to$ Klik *"Simpan Draf & Tinjau"* $\to$ Baca ringkasan perubahan di halaman *"Apa yang berubah?"* $\to$ Klik *"Setujui & Publikasikan"* $\to$ Edisi resmi baru aktif untuk penanaman berikutnya.
+### 3. Demonstrasi Alur Kerja:
+- **Alur Petani (Catat Kegiatan):** Buka Beranda $\to$ Klik tombol *"Catat Kegiatan"* $\to$ Pilih Masa Tanam (`MT-2026-TOMAT-01`), Jenis Kegiatan (*Pemupukan*), isi takaran dan catatan $\to$ Klik Simpan $\to$ Catatan otomatis tersimpan dan divalidasi terhadap batas aman anjuran.
+- **Alur Mandor (Perbarui & Terbitkan Panduan):** Buka Kelola Panduan $\to$ Buka *SOP Tomat* $\to$ Ubah nilai target rekomendasi $\to$ Klik *"Simpan Draf & Periksa Perubahan"* $\to$ Tinjau ringkasan perubahan di halaman *"Apa yang berubah?"* $\to$ Klik *"Setujui & Publikasikan"* $\to$ Edisi resmi baru aktif untuk penanaman berikutnya.
 
 ---
 
@@ -94,6 +125,7 @@ Aplikasi akan aktif di: **[http://127.0.0.1:8080](http://127.0.0.1:8080)**.
 ```
 verdant/
 ├── build.sbt                                 # Konfigurasi sbt (Scala 3.3.4, Cask, uPickle, Scalatags, SQLite)
+├── README.md                                 # Dokumentasi arsitektur dan panduan pengguna
 ├── project/
 │   └── build.properties                      # Versi sbt (1.10.7)
 ├── test_verdant_workflows.ps1                # Skrip otomatisasi pengujian HTTP seluruh alur
@@ -101,13 +133,20 @@ verdant/
 │   ├── main/
 │   │   └── scala/
 │   │       └── verdant/
-│   │           ├── Main.scala                # Shell: Cask routes & HTTP handlers
+│   │           ├── Main.scala                # Shell: Cask routes & HTTP handlers & Role Separation
 │   │           ├── core/
 │   │           │   ├── Domain.scala          # Core: Immutable Case Classes & Model Pertanian
 │   │           │   └── VerdantCore.scala     # Core: 100% Pure Functional Logic & FP Rubric
 │   │           └── shell/
 │   │               ├── Database.scala        # Shell: SQLite persistence & realistic Indonesian seed
-│   │               └── Views.scala           # Shell: Responsive mobile-first HTML (Bootstrap 5)
+│   │               ├── Views.scala           # Shell: Facade utama tampilan web (Trait Mixin)
+│   │               └── views/                # Shell: Modul-modul tampilan HTML terpisah
+│   │                   ├── ViewHelpers.scala     # Format tanggal & utilitas tampilan
+│   │                   ├── SharedModals.scala    # Pop-up dialog form (Catat, Buka MT, SOP Baru)
+│   │                   ├── LayoutView.scala      # Master layout HTML, Navbar, Bootstrap 5, Role Switcher
+│   │                   ├── FarmerViews.scala     # Antarmuka Petani (Beranda, Masa Tanam, Panduan)
+│   │                   ├── SupervisorViews.scala # Antarmuka Mandor (Kelola SOP, Diff, Riwayat)
+│   │                   └── JournalViews.scala    # Jurnal rekapitulasi catatan harian
 │   └── test/
 │       └── scala/
 │           └── verdant/
@@ -118,5 +157,5 @@ verdant/
 ---
 
 ## 🌾 Batasan & Catatan Desain
-- **Kemandirian Dependensi:** Menggunakan Bootstrap 5 via CDN dan vanilla JavaScript modular tanpa memerlukan Node.js atau npm, sehingga seluruh proyek dapat dikompilasi langsung menggunakan `sbt`.
+- **Kemandirian Dependensi:** Menggunakan Bootstrap 5 via CDN dan Scalatags type-safe HTML tanpa memerlukan Node.js atau npm, sehingga seluruh proyek dapat dikompilasi langsung menggunakan `sbt`.
 - **Database Embedded:** Menggunakan SQLite JDBC dengan mode Write-Ahead Logging (WAL) dan kunci asing (*Foreign Keys*) aktif untuk keandalan transaksi lokal.

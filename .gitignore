@@ -1,0 +1,17 @@
+# Target directories
+target/
+project/target/
+project/project/
+
+# Metals & Bloop
+.metals/
+.bloop/
+.bsp/
+
+# SQLite Databases & temporary journal files
+*.db
+*.db-wal
+*.db-shm
+
+# Logs
+*.log

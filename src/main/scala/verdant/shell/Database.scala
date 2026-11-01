@@ -373,6 +373,59 @@ class Database(dbPath: String = "verdant.db"):
       Right(PublishedGuide(editionTag, guideId, revisionId, "DITERBITKAN", approvedBy, notes, ts))
   }
 
+  def getDraftsAwaitingReview(): List[(GuideRow, GuideRevision, Option[PublishedGuide])] =
+    listGuides().flatMap { guide =>
+      val latestRevOpt = getLatestRevision(guide.id)
+      val latestPubOpt = getLatestPublishedGuide(guide.id)
+      latestRevOpt.flatMap { latestRev =>
+        latestPubOpt match
+          case None =>
+            Some((guide, latestRev, None))
+          case Some(pub) if pub.revisionId != latestRev.id =>
+            Some((guide, latestRev, Some(pub)))
+          case _ =>
+            None
+      }
+    }
+
+  def listPublishedGuidesWithSnapshots(): List[(GuideRow, PublishedGuide, GuideSnapshot)] =
+    listGuides().flatMap { guide =>
+      getLatestPublishedGuide(guide.id).flatMap { pub =>
+        getRevision(pub.revisionId).map { rev =>
+          (guide, pub, rev.snapshot)
+        }
+      }
+    }
+
+  def rejectDraft(
+    guideId: String,
+    rejectedBy: String,
+    reason: String
+  ): Either[String, Unit] = withConnection { conn =>
+    getLatestPublishedGuide(guideId) match
+      case None =>
+        Left("Panduan ini belum memiliki edisi resmi yang pernah terbit. Draf awal tidak dapat dibatalkan ke edisi sebelumnya.")
+      case Some(pub) =>
+        val currHead = getLatestRevision(guideId)
+        if currHead.map(_.id).contains(pub.revisionId) then
+          Left("Tidak ada draf yang berbeda dari edisi resmi saat ini.")
+        else
+          val ps = conn.prepareStatement(
+            """
+            DELETE FROM guide_revisions 
+            WHERE guide_id = ? 
+              AND id != ? 
+              AND id NOT IN (SELECT revision_id FROM published_guides)
+              AND id NOT IN (SELECT revision_id FROM cultivation_periods)
+            """
+          )
+          ps.setString(1, guideId)
+          ps.setString(2, pub.revisionId)
+          ps.executeUpdate()
+          ps.close()
+          Right(())
+  }
+
   // ==========================================================================
   // MASA TANAM (CULTIVATION PERIODS)
   // ==========================================================================
